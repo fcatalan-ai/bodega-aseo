@@ -480,6 +480,107 @@ def kpis_filtrado():
         'detalle':        detalle,
     })
 
+
+
+@app.route('/api/movimientos/historial')
+@login_required
+def get_historial():
+    tipo     = request.args.get('tipo','')
+    edificio = request.args.get('edificio','')
+    cat      = request.args.get('categoria_filtro','')
+    q        = request.args.get('q','')
+    desde    = request.args.get('desde','')
+    hasta    = request.args.get('hasta','')
+
+    sql = """SELECT m.id, m.fecha, m.tipo, m.cantidad, m.edificio,
+                    m.usuario, m.observacion, m.producto_id,
+                    p.nombre as producto_nombre, p.categoria, p.unidad
+             FROM movimientos m JOIN productos p ON m.producto_id=p.id
+             WHERE 1=1"""
+    params = []
+    if tipo:     sql += " AND m.tipo=?";          params.append(tipo)
+    if edificio: sql += " AND m.edificio=?";      params.append(edificio)
+    if cat:      sql += " AND p.categoria=?";     params.append(cat)
+    if q:        sql += " AND p.nombre LIKE ?";   params.append(f'%{q}%')
+    if desde:
+        # desde viene como YYYY-MM-DD, convertir a DD-MM-YYYY para comparar
+        parts = desde.split('-')
+        if len(parts)==3:
+            desde_fmt = f"{parts[2]}-{parts[1]}-{parts[0]}"
+            sql += " AND m.fecha >= ?"; params.append(desde_fmt)
+    if hasta:
+        parts = hasta.split('-')
+        if len(parts)==3:
+            hasta_fmt = f"{parts[2]}-{parts[1]}-{parts[0]}"
+            sql += " AND m.fecha <= ?"; params.append(hasta_fmt)
+    sql += " ORDER BY m.created_at DESC LIMIT 500"
+    return jsonify(db_fetchall(sql, params))
+
+@app.route('/movimientos')
+@login_required
+def movimientos_page():
+    return render_template('movimientos.html',
+        user=session['user'], rol=session['rol'],
+        categorias=CATEGORIAS, edificios=EDIFICIOS)
+
+@app.route('/api/movimientos/<int:mid>', methods=['PUT'])
+@login_required
+def editar_movimiento(mid):
+    d = request.json
+    # Obtener movimiento original
+    mov = db_fetchone("SELECT * FROM movimientos WHERE id=?", (mid,))
+    if not mov: return jsonify({'error':'No encontrado'}), 404
+
+    nueva_cant = int(d.get('cantidad', mov['cantidad']))
+    nuevo_tipo = d.get('tipo', mov['tipo'])
+    dif = nueva_cant - mov['cantidad']
+
+    conn2, mode2 = get_db()
+    cur2 = conn2.cursor()
+    if mode2 == 'pg':
+        cur2.execute(
+            "UPDATE movimientos SET cantidad=%s,edificio=%s,observacion=%s,fecha=%s WHERE id=%s",
+            (nueva_cant, d.get('edificio', mov['edificio']),
+             d.get('observacion', mov['observacion']),
+             d.get('fecha', mov['fecha']), mid))
+        # Ajustar stock: si era salida, revertir diferencia
+        if mov['tipo'] == 'salida':
+            cur2.execute("UPDATE productos SET stock_actual=stock_actual-%s WHERE id=%s", (dif, mov['producto_id']))
+        else:
+            cur2.execute("UPDATE productos SET stock_actual=stock_actual+%s WHERE id=%s", (dif, mov['producto_id']))
+    else:
+        cur2.execute(
+            "UPDATE movimientos SET cantidad=?,edificio=?,observacion=?,fecha=? WHERE id=?",
+            (nueva_cant, d.get('edificio', mov['edificio']),
+             d.get('observacion', mov['observacion']),
+             d.get('fecha', mov['fecha']), mid))
+        if mov['tipo'] == 'salida':
+            cur2.execute("UPDATE productos SET stock_actual=stock_actual-? WHERE id=?", (dif, mov['producto_id']))
+        else:
+            cur2.execute("UPDATE productos SET stock_actual=stock_actual+? WHERE id=?", (dif, mov['producto_id']))
+    conn2.commit()
+    conn2.close()
+    return jsonify({'ok': True})
+
+@app.route('/api/movimientos/<int:mid>', methods=['DELETE'])
+@login_required
+def eliminar_movimiento(mid):
+    mov = db_fetchone("SELECT * FROM movimientos WHERE id=?", (mid,))
+    if not mov: return jsonify({'error':'No encontrado'}), 404
+    # Revertir stock
+    conn2, mode2 = get_db()
+    cur2 = conn2.cursor()
+    delta = mov['cantidad'] if mov['tipo'] == 'salida' else -mov['cantidad']
+    if mode2 == 'pg':
+        cur2.execute("UPDATE productos SET stock_actual=stock_actual+%s WHERE id=%s", (delta, mov['producto_id']))
+        cur2.execute("DELETE FROM movimientos WHERE id=%s", (mid,))
+    else:
+        cur2.execute("UPDATE productos SET stock_actual=stock_actual+? WHERE id=?", (delta, mov['producto_id']))
+        cur2.execute("DELETE FROM movimientos WHERE id=?", (mid,))
+    conn2.commit()
+    conn2.close()
+    return jsonify({'ok': True})
+
 if __name__=='__main__':
     init_db()
     app.run(debug=False,host='0.0.0.0',port=int(os.environ.get('PORT',5000)))
