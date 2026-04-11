@@ -76,13 +76,20 @@ def init_db():
     )''')
     # Usuario unico compartido
     if mode == 'pg':
+        admin_email = os.environ.get('ADMIN_EMAIL','bodega@colegio.cl')
+        admin_pass  = os.environ.get('ADMIN_PASS','bodega2025')
         cur.execute("INSERT INTO usuarios (nombre,email,password,rol,edificio) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (email) DO NOTHING",
-            ('Bodega', os.environ.get('ADMIN_EMAIL','bodega@colegio.cl'),
-             os.environ.get('ADMIN_PASS','bodega2025'), 'admin', ''))
+            ('Bodega', admin_email, admin_pass, 'admin', ''))
+        # Siempre actualizar credenciales al arrancar
+        cur.execute("UPDATE usuarios SET password=%s, email=%s WHERE rol='admin'",
+            (admin_pass, admin_email))
     else:
+        admin_email = os.environ.get('ADMIN_EMAIL','bodega@colegio.cl')
+        admin_pass  = os.environ.get('ADMIN_PASS','bodega2025')
         cur.execute("INSERT OR IGNORE INTO usuarios (nombre,email,password,rol,edificio) VALUES (?,?,?,?,?)",
-            ('Bodega', os.environ.get('ADMIN_EMAIL','bodega@colegio.cl'),
-             os.environ.get('ADMIN_PASS','bodega2025'), 'admin', ''))
+            ('Bodega', admin_email, admin_pass, 'admin', ''))
+        cur.execute("UPDATE usuarios SET password=?, email=? WHERE rol='admin'",
+            (admin_pass, admin_email))
     conn.commit()
     conn.close()
 
