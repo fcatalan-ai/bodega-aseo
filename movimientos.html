@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Movimientos — Bodega Aseo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
+.topbar{background:#0D4F3C;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar h1{font-size:16px;font-weight:700}
+.topbar-links{display:flex;gap:14px;font-size:13px}
+.topbar-links a{color:#A8D5C5;text-decoration:none}
+.topbar-links a:hover{color:#fff}
+.topbar-links a.active{color:#FFD966;font-weight:600}
+.main{padding:16px;max-width:1300px;margin:0 auto}
+/* TABS ENTRADA/SALIDA */
+.tipo-tabs{display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid #e5e8ed;background:#fff;width:fit-content}
+.tipo-tab{padding:10px 28px;font-size:14px;font-weight:600;cursor:pointer;border:none;background:#fff;color:#888;transition:all 0.2s}
+.tipo-tab.active-e{background:#0D4F3C;color:#fff}
+.tipo-tab.active-s{background:#C00;color:#fff}
+.tipo-tab:hover:not(.active-e):not(.active-s){background:#f0f4f8}
+/* FILTROS */
+.filtros{background:#fff;border-radius:10px;border:1px solid #e5e8ed;padding:14px;margin-bottom:14px}
+.filtros-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.fg label{font-size:11px;color:#666;display:block;margin-bottom:3px}
+.fg input,.fg select{padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;background:#fff;min-width:130px}
+.btn-buscar{background:#0D4F3C;color:#fff;border:none;padding:8px 16px;border-radius:7px;font-size:13px;cursor:pointer}
+.btn-buscar:hover{background:#1a6b52}
+.btn-reset{background:#fff;color:#555;border:1px solid #ddd;padding:8px 12px;border-radius:7px;font-size:13px;cursor:pointer}
+/* STATS */
+.mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.mini-stat{background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #e5e8ed}
+.mini-stat-n{font-size:20px;font-weight:700}
+.mini-stat-l{font-size:11px;color:#888;margin-top:2px}
+/* TABLA */
+.table-wrap{background:#fff;border-radius:10px;border:1px solid #e5e8ed;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px}
+th{padding:9px 12px;text-align:left;font-size:11px;font-weight:600;white-space:nowrap}
+th.th-e{background:#0D4F3C;color:#fff}
+th.th-s{background:#C00;color:#fff}
+td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#f8faf8}
+.badge-e{background:#E2EFDA;color:#27500A;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-s{background:#FCEBEB;color:#791F1F;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-cat{background:#E6F1FB;color:#0C447C;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+.btn-sm{padding:4px 9px;border-radius:5px;font-size:11px;cursor:pointer;border:1px solid #ddd;background:#f8f8f8}
+.btn-edit{color:#1F3864;border-color:#BDD7EE}
+.btn-del{color:#c00;border-color:#fcc}
+.loading{text-align:center;padding:30px;color:#999;font-size:13px}
+.paginacion{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#fff;border-top:1px solid #f0f0f0;font-size:12px;color:#888}
+.pag-btns{display:flex;gap:6px}
+.pag-btn{padding:4px 10px;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;font-size:12px}
+.pag-btn:hover{background:#f0f4f8}
+.pag-btn.active{background:#0D4F3C;color:#fff;border-color:#0D4F3C}
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:460px;margin:16px}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:14px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.form-group label{font-size:12px;color:#666;display:block;margin-bottom:3px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.btn-cancel{padding:7px 16px;border-radius:7px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:13px}
+.btn-save{padding:7px 18px;border-radius:7px;border:none;background:#0D4F3C;color:#fff;cursor:pointer;font-size:13px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>🧴 Bodega de Aseo — Movimientos</h1>
+  <div class="topbar-links">
+    <a href="/">📦 Inventario</a>
+    <a href="/dashboard">📊 Dashboard</a>
+    <a href="/movimientos" class="active">📋 Movimientos</a>
+    <a href="/logout">Salir</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- TABS TIPO -->
+  <div class="tipo-tabs">
+    <button class="tipo-tab active-e" id="tab-e" onclick="setTipo('entrada')">📥 Entradas</button>
+    <button class="tipo-tab" id="tab-s" onclick="setTipo('salida')">📤 Salidas</button>
+    <button class="tipo-tab" id="tab-t" onclick="setTipo('')">📋 Todos</button>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filtros">
+    <div class="filtros-row">
+      <div class="fg">
+        <label>Producto</label>
+        <input type="text" id="f-prod" placeholder="Nombre del producto...">
+      </div>
+      <div class="fg">
+        <label>Categoría</label>
+        <select id="f-cat">
+          <option value="">Todas</option>
+          {% for c in categorias %}<option>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="fg">
+        <label>Edificio</label>
+        <select id="f-ed">
+          <option value="">Todos</option>
+          {% for e in edificios %}<option>{{ e }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="fg">
+        <label>Desde</label>
+        <input type="date" id="f-desde">
+      </div>
+      <div class="fg">
+        <label>Hasta</label>
+        <input type="date" id="f-hasta">
+      </div>
+      <div class="fg" style="display:flex;gap:6px">
+        <button class="btn-buscar" onclick="cargar()">🔍 Buscar</button>
+        <button class="btn-reset" onclick="resetFiltros()">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MINI STATS -->
+  <div class="mini-stats">
+    <div class="mini-stat">
+      <div class="mini-stat-n" id="ms-total">—</div>
+      <div class="mini-stat-l">Movimientos</div>
+    </div>
+    <div class="mini-stat">
+      <div class="mini-stat-n" id="ms-cant" style="color:#0D4F3C">—</div>
+      <div class="mini-stat-l">Total unidades</div>
+    </div>
+    <div class="mini-stat">
+      <div class="mini-stat-n" id="ms-export" style="font-size:13px;cursor:pointer;color:#2E74B5" onclick="exportar()">📥 Exportar Excel</div>
+      <div class="mini-stat-l">Resultados actuales</div>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr id="thead-row">
+          <th class="th-e">Fecha</th>
+          <th class="th-e">Tipo</th>
+          <th class="th-e">Producto</th>
+          <th class="th-e">Categoría</th>
+          <th class="th-e">Cantidad</th>
+          <th class="th-e">Edificio</th>
+          <th class="th-e">Usuario</th>
+          <th class="th-e">Observación</th>
+          <th class="th-e"></th>
+        </tr>
+      </thead>
+      <tbody id="tabla-body">
+        <tr><td colspan="9" class="loading">Cargando movimientos...</td></tr>
+      </tbody>
+    </table>
+    <div class="paginacion">
+      <span id="pag-info">—</span>
+      <div class="pag-btns" id="pag-btns"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR -->
+<div class="modal-bg" id="modal-edit">
+  <div class="modal">
+    <h3 id="edit-title">✏️ Editar movimiento</h3>
+    <input type="hidden" id="edit-id">
+    <div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px" id="edit-info"></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="edit-fecha">
+      </div>
+      <div class="form-group">
+        <label>Cantidad *</label>
+        <input type="number" id="edit-cant" min="1">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Edificio</label>
+        <select id="edit-ed">
+          <option value="">Sin edificio</option>
+          {% for e in edificios %}<option>{{ e }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Observación</label>
+        <input type="text" id="edit-obs" placeholder="Opcional">
+      </div>
+    </div>
+    <div style="background:#FFF2CC;border-radius:6px;padding:8px;font-size:12px;color:#7F3F00;margin-top:4px">
+      ⚠️ Al editar la cantidad, el stock del producto se ajusta automáticamente.
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-save" onclick="guardarEdicion()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let tipoActual = 'entrada';
+let movimientos = [];
+let paginaActual = 1;
+const POR_PAGINA = 25;
+
+function setTipo(tipo){
+  tipoActual = tipo;
+  document.getElementById('tab-e').className = 'tipo-tab' + (tipo==='entrada'?' active-e':'');
+  document.getElementById('tab-s').className = 'tipo-tab' + (tipo==='salida'?' active-s':'');
+  document.getElementById('tab-t').className = 'tipo-tab' + (tipo===''?' active-e':'');
+  const thClass = tipo==='salida'?'th-s':'th-e';
+  document.querySelectorAll('#thead-row th').forEach(th=>{
+    th.className = thClass;
+  });
+  paginaActual = 1;
+  cargar();
+}
+
+async function cargar(){
+  const params = new URLSearchParams();
+  if(tipoActual) params.set('tipo', tipoActual);
+  const prod = document.getElementById('f-prod').value;
+  const cat  = document.getElementById('f-cat').value;
+  const ed   = document.getElementById('f-ed').value;
+  const desde= document.getElementById('f-desde').value;
+  const hasta= document.getElementById('f-hasta').value;
+  if(cat)   params.set('categoria_filtro', cat);
+  if(ed)    params.set('edificio', ed);
+  // Usar ruta con más params
+  let url = '/api/movimientos/historial?'+params;
+  if(prod)  url += '&q='+encodeURIComponent(prod);
+  if(desde) url += '&desde='+desde;
+  if(hasta) url += '&hasta='+hasta;
+
+  const r = await fetch(url);
+  movimientos = await r.json();
+  paginaActual = 1;
+  renderTabla();
+}
+
+function renderTabla(){
+  const inicio = (paginaActual-1)*POR_PAGINA;
+  const pagina = movimientos.slice(inicio, inicio+POR_PAGINA);
+  const total_cant = movimientos.reduce((s,m)=>s+m.cantidad,0);
+
+  document.getElementById('ms-total').textContent = movimientos.length;
+  document.getElementById('ms-cant').textContent = total_cant.toLocaleString('es-CL');
+
+  if(!pagina.length){
+    document.getElementById('tabla-body').innerHTML='<tr><td colspan="9" class="loading">No se encontraron movimientos</td></tr>';
+    document.getElementById('pag-info').textContent='Sin resultados';
+    document.getElementById('pag-btns').innerHTML='';
+    return;
+  }
+
+  document.getElementById('tabla-body').innerHTML = pagina.map(m=>`
+    <tr>
+      <td style="white-space:nowrap">${m.fecha||'—'}</td>
+      <td><span class="${m.tipo==='entrada'?'badge-e':'badge-s'}">${m.tipo==='entrada'?'📥 Entrada':'📤 Salida'}</span></td>
+      <td style="font-weight:600;color:#0D4F3C">${m.producto_nombre||'—'}</td>
+      <td><span class="badge-cat">${m.categoria||'—'}</span></td>
+      <td style="font-weight:700;font-size:14px">${m.cantidad} <small style="font-weight:400;color:#888">${m.unidad||''}</small></td>
+      <td>${m.edificio||'—'}</td>
+      <td style="font-size:12px;color:#888">${m.usuario||'—'}</td>
+      <td style="font-size:12px;color:#666;max-width:150px;overflow:hidden;text-overflow:ellipsis">${m.observacion||''}</td>
+      <td>
+        <button class="btn-sm btn-edit" onclick="abrirEditar(${m.id})">✏️</button>
+        <button class="btn-sm btn-del" onclick="eliminar(${m.id},'${(m.producto_nombre||'').replace(/'/g,'')}')">🗑️</button>
+      </td>
+    </tr>`).join('');
+
+  // Paginacion
+  const totalPags = Math.ceil(movimientos.length/POR_PAGINA);
+  document.getElementById('pag-info').textContent =
+    `Mostrando ${inicio+1}-${Math.min(inicio+POR_PAGINA,movimientos.length)} de ${movimientos.length}`;
+  let btns = '';
+  for(let i=1;i<=totalPags;i++){
+    if(i===1||i===totalPags||Math.abs(i-paginaActual)<=2){
+      btns+=`<button class="pag-btn${i===paginaActual?' active':''}" onclick="irPagina(${i})">${i}</button>`;
+    } else if(Math.abs(i-paginaActual)===3){
+      btns+='<span style="padding:4px">…</span>';
+    }
+  }
+  document.getElementById('pag-btns').innerHTML = btns;
+}
+
+function irPagina(p){ paginaActual=p; renderTabla(); window.scrollTo(0,0); }
+
+function resetFiltros(){
+  ['f-prod','f-cat','f-ed','f-desde','f-hasta'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+  cargar();
+}
+
+function abrirEditar(id){
+  const m = movimientos.find(x=>x.id===id);
+  if(!m) return;
+  document.getElementById('edit-id').value = id;
+  document.getElementById('edit-title').textContent =
+    (m.tipo==='entrada'?'✏️ Editar Entrada':'✏️ Editar Salida');
+  document.getElementById('edit-info').innerHTML =
+    `<strong>${m.producto_nombre}</strong> · ${m.categoria} · ${m.tipo}`;
+  document.getElementById('edit-fecha').value = m.fecha ? m.fecha.split('-').reverse().join('-') : '';
+  document.getElementById('edit-cant').value = m.cantidad;
+  document.getElementById('edit-ed').value = m.edificio||'';
+  document.getElementById('edit-obs').value = m.observacion||'';
+  document.getElementById('modal-edit').classList.add('show');
+}
+
+async function guardarEdicion(){
+  const id = document.getElementById('edit-id').value;
+  const cant = parseInt(document.getElementById('edit-cant').value);
+  if(!cant||cant<=0){ alert('Ingresa una cantidad válida'); return; }
+  const fechaInput = document.getElementById('edit-fecha').value;
+  const fechaFmt = fechaInput ? fechaInput.split('-').reverse().join('-') : '';
+  const data = {
+    cantidad: cant,
+    edificio: document.getElementById('edit-ed').value,
+    observacion: document.getElementById('edit-obs').value,
+    fecha: fechaFmt,
+  };
+  const r = await fetch('/api/movimientos/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  const d = await r.json();
+  if(d.ok){ cerrarModal(); cargar(); }
+  else alert('Error: '+d.error);
+}
+
+async function eliminar(id, nombre){
+  if(!confirm(`¿Eliminar este movimiento de "${nombre}"?\n\nEl stock se ajustará automáticamente.`)) return;
+  const r = await fetch('/api/movimientos/'+id,{method:'DELETE'});
+  const d = await r.json();
+  if(d.ok) cargar();
+  else alert('Error: '+d.error);
+}
+
+function cerrarModal(){ document.getElementById('modal-edit').classList.remove('show'); }
+
+function exportar(){ window.location='/api/export/movimientos'; }
+
+// Cargar al inicio
+cargar();
+</script>
+</body>
+</html>
