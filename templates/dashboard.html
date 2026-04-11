@@ -14,29 +14,58 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 .topbar-links a:hover,.topbar-links a.active{color:#FFD966;font-weight:600}
 .main{padding:20px;max-width:1400px;margin:0 auto}
 .sec{font-size:12px;font-weight:700;color:#0D4F3C;text-transform:uppercase;letter-spacing:.05em;margin:20px 0 10px;border-left:4px solid #0D4F3C;padding-left:8px}
+/* KPIs */
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:4px}
 @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
 .kpi{background:#fff;border-radius:10px;padding:16px;border:1px solid #e5e8ed;display:flex;align-items:center;gap:12px}
 .kpi-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
 .kpi-n{font-size:22px;font-weight:700;color:#0D4F3C;line-height:1}
 .kpi-l{font-size:11px;color:#888;margin-top:3px}
+/* FILTRO */
+.filtro-card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;padding:16px;margin-bottom:16px}
+.filtro-title{font-size:12px;font-weight:700;color:#0D4F3C;text-transform:uppercase;margin-bottom:12px}
+.filtro-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.filtro-group label{font-size:11px;color:#666;display:block;margin-bottom:4px}
+.filtro-group input,.filtro-group select{padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;background:#fff}
+.btn-filtrar{background:#0D4F3C;color:#fff;border:none;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer}
+.btn-filtrar:hover{background:#1a6b52}
+.btn-limpiar{background:#fff;color:#0D4F3C;border:1px solid #0D4F3C;padding:8px 14px;border-radius:7px;font-size:13px;cursor:pointer}
+.btn-limpiar:hover{background:#f0f7f4}
+.filtro-activo{background:#E2EFDA;border:1px solid #70AD47;border-radius:6px;padding:4px 10px;font-size:12px;color:#27500A;font-weight:600}
+/* RESULTADOS FILTRO */
+.resultado-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.res-card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;padding:14px;text-align:center}
+.res-n{font-size:24px;font-weight:700}
+.res-l{font-size:11px;color:#888;margin-top:3px}
+/* CHARTS */
 .charts-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
 .charts-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
 @media(max-width:900px){.charts-2,.charts-3{grid-template-columns:1fr}}
 .chart-card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;padding:16px}
 .chart-title{font-size:11px;font-weight:700;color:#0D4F3C;margin-bottom:10px;text-transform:uppercase}
 .chart-wrap{position:relative;height:220px}
+/* TABLA */
 .table-card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;overflow:hidden;margin-bottom:14px}
 .table-card table{width:100%;border-collapse:collapse;font-size:12px}
 .table-card th{background:#0D4F3C;color:#fff;padding:8px 12px;text-align:left;font-size:11px}
 .table-card td{padding:8px 12px;border-bottom:1px solid #f0f0f0}
 .table-card tr:last-child td{border-bottom:none}
 .table-card tr:hover td{background:#f0f7f4}
+.badge-e{background:#E2EFDA;color:#27500A;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-s{background:#FCEBEB;color:#791F1F;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-cat{background:#E6F1FB;color:#0C447C;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
 .alerta{background:#fff;border:1px solid #fcc;border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
-.alerta-nombre{font-weight:700;font-size:13px;color:#C00}
-.alerta-info{font-size:12px;color:#888}
-.alerta-stock{font-size:18px;font-weight:700;color:#C00}
 .loading{text-align:center;padding:30px;color:#999}
+/* IMPORT MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:500px;margin:16px}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:16px;color:#0D4F3C}
+.upload-area{border:2px dashed #A8D5C5;border-radius:8px;padding:24px;text-align:center;cursor:pointer;background:#f0f7f4;transition:border-color 0.2s}
+.upload-area:hover{border-color:#0D4F3C}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.btn-cancel{padding:8px 18px;border-radius:7px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:13px}
+.btn-save{padding:8px 20px;border-radius:7px;border:none;background:#0D4F3C;color:#fff;cursor:pointer;font-size:13px}
 </style>
 </head>
 <body>
@@ -50,6 +79,8 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 </div>
 
 <div class="main">
+
+  <!-- KPIs GENERALES -->
   <div class="sec">Resumen general</div>
   <div class="kpi-grid">
     <div class="kpi"><div class="kpi-icon" style="background:#E2EFDA">📦</div><div><div class="kpi-n" id="k-prod">—</div><div class="kpi-l">Productos activos</div></div></div>
@@ -58,14 +89,97 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
     <div class="kpi"><div class="kpi-icon" style="background:#FCE4D6">📤</div><div><div class="kpi-n" id="k-sal">—</div><div class="kpi-l">Total salidas</div></div></div>
   </div>
 
-  <div class="sec">Stock y consumo</div>
+  <!-- BOTÓN IMPORTAR -->
+  <div style="display:flex;justify-content:flex-end;margin:10px 0">
+    <button class="btn-filtrar" onclick="document.getElementById('modal-import').classList.add('show')">
+      📤 Importar productos desde Excel
+    </button>
+  </div>
+
+  <!-- FILTRO POR FECHA -->
+  <div class="sec">Filtrar consumo por período</div>
+  <div class="filtro-card">
+    <div class="filtro-title">Selecciona un período para analizar entradas y salidas</div>
+    <div class="filtro-row">
+      <div class="filtro-group">
+        <label>Mes rápido</label>
+        <select id="f-mes">
+          <option value="">— Seleccionar mes —</option>
+          <option value="01-2025">Enero 2025</option>
+          <option value="02-2025">Febrero 2025</option>
+          <option value="03-2025">Marzo 2025</option>
+          <option value="04-2025">Abril 2025</option>
+          <option value="05-2025">Mayo 2025</option>
+          <option value="06-2025">Junio 2025</option>
+          <option value="07-2025">Julio 2025</option>
+          <option value="08-2025">Agosto 2025</option>
+          <option value="09-2025">Septiembre 2025</option>
+          <option value="10-2025">Octubre 2025</option>
+          <option value="11-2025">Noviembre 2025</option>
+          <option value="12-2025">Diciembre 2025</option>
+          <option value="01-2026">Enero 2026</option>
+          <option value="02-2026">Febrero 2026</option>
+          <option value="03-2026">Marzo 2026</option>
+          <option value="04-2026">Abril 2026</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;color:#999;font-size:13px;padding-bottom:2px">— o rango —</div>
+      <div class="filtro-group">
+        <label>Desde</label>
+        <input type="date" id="f-desde">
+      </div>
+      <div class="filtro-group">
+        <label>Hasta</label>
+        <input type="date" id="f-hasta">
+      </div>
+      <div class="filtro-group">
+        <button class="btn-filtrar" onclick="aplicarFiltro()">🔍 Filtrar</button>
+      </div>
+      <div class="filtro-group">
+        <button class="btn-limpiar" onclick="limpiarFiltro()">✕ Limpiar</button>
+      </div>
+    </div>
+    <div id="filtro-badge" style="margin-top:10px;display:none">
+      <span class="filtro-activo" id="filtro-texto">Filtrando por: —</span>
+    </div>
+  </div>
+
+  <!-- RESULTADOS FILTRADO -->
+  <div id="seccion-filtro" style="display:none">
+    <div class="sec" id="filtro-sec-title">Resultados del período</div>
+    <div class="resultado-grid">
+      <div class="res-card"><div class="res-n" id="r-entradas" style="color:#0D4F3C">—</div><div class="res-l">Total entradas</div></div>
+      <div class="res-card"><div class="res-n" id="r-salidas" style="color:#C00">—</div><div class="res-l">Total salidas</div></div>
+      <div class="res-card"><div class="res-n" id="r-diferencia" style="color:#2E74B5">—</div><div class="res-l">Diferencia neta</div></div>
+    </div>
+    <div class="charts-2">
+      <div class="chart-card">
+        <div class="chart-title">Consumo por edificio (período)</div>
+        <div class="chart-wrap"><canvas id="ch-f-ed"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Productos más consumidos (período)</div>
+        <div class="chart-wrap"><canvas id="ch-f-prod"></canvas></div>
+      </div>
+    </div>
+    <div class="sec">Detalle de movimientos del período</div>
+    <div class="table-card">
+      <table>
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Cantidad</th><th>Edificio</th><th>Usuario</th></tr></thead>
+        <tbody id="tabla-detalle"><tr><td colspan="6" class="loading">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- GRÁFICOS GENERALES -->
+  <div class="sec">Estadísticas generales</div>
   <div class="charts-3">
     <div class="chart-card">
       <div class="chart-title">Stock por categoría</div>
       <div class="chart-wrap"><canvas id="ch-cat"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Consumo por edificio</div>
+      <div class="chart-title">Consumo total por edificio</div>
       <div class="chart-wrap"><canvas id="ch-ed"></canvas></div>
     </div>
     <div class="chart-card">
@@ -73,21 +187,22 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
       <div class="chart-wrap"><canvas id="ch-top"></canvas></div>
     </div>
   </div>
-
   <div class="charts-2">
     <div class="chart-card">
       <div class="chart-title">Entradas vs Salidas por fecha</div>
       <div class="chart-wrap"><canvas id="ch-mes"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">Consumo por edificio (detalle productos)</div>
+      <div class="chart-title">Consumo por edificio por producto</div>
       <div class="chart-wrap"><canvas id="ch-ed-prod"></canvas></div>
     </div>
   </div>
 
+  <!-- ALERTAS -->
   <div class="sec">⚠️ Alertas — Productos bajo stock mínimo</div>
   <div id="alertas-list"><div class="loading">Cargando...</div></div>
 
+  <!-- TOP PRODUCTOS -->
   <div class="sec">Productos más consumidos</div>
   <div class="table-card">
     <table>
@@ -97,20 +212,38 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
   </div>
 </div>
 
+<!-- MODAL IMPORTAR -->
+<div class="modal-bg" id="modal-import">
+  <div class="modal">
+    <h3>📤 Importar productos desde Excel</h3>
+    <p style="font-size:13px;color:#555;margin-bottom:14px">Usa la plantilla <strong>PLANTILLA_BODEGA_ASEO.xlsx</strong> — hoja <strong>PRODUCTOS</strong></p>
+    <div class="upload-area" onclick="document.getElementById('imp-input').click()">
+      <input type="file" id="imp-input" accept=".xlsx,.xls" style="display:none" onchange="previewImport()">
+      <div id="imp-label">📊 <strong>Haz click para seleccionar el archivo</strong><br><small style="color:#888">.xlsx — máx 10MB</small></div>
+    </div>
+    <div id="imp-status" style="font-size:13px;margin-top:10px;text-align:center"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="document.getElementById('modal-import').classList.remove('show')">Cancelar</button>
+      <button class="btn-save" id="btn-imp" onclick="ejecutarImport()" disabled>Importar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const COLORS = ['#0D4F3C','#1a6b52','#27500A','#70AD47','#2E74B5','#ED7D31','#7030A0','#C00','#FFC000'];
 const FMT = n => Number(n||0).toLocaleString('es-CL');
+let chartFEd=null, chartFProd=null;
 
-async function cargar(){
-  const [stats, kpis] = await Promise.all([fetch('/api/stats').then(r=>r.json()), fetch('/api/kpis').then(r=>r.json())]);
-
-  // KPIs
+async function cargarGeneral(){
+  const [stats, kpis] = await Promise.all([
+    fetch('/api/stats').then(r=>r.json()),
+    fetch('/api/kpis').then(r=>r.json())
+  ]);
   document.getElementById('k-prod').textContent  = stats.total_productos||0;
   document.getElementById('k-alert').textContent = stats.bajo_minimo||0;
   document.getElementById('k-ent').textContent   = FMT(stats.total_entradas);
   document.getElementById('k-sal').textContent   = FMT(stats.total_salidas);
 
-  // Stock por categoria
   const cats = kpis.por_categoria||[];
   new Chart(document.getElementById('ch-cat'),{
     type:'doughnut',
@@ -118,7 +251,6 @@ async function cargar(){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}
   });
 
-  // Consumo por edificio
   const eds = kpis.por_edificio||[];
   new Chart(document.getElementById('ch-ed'),{
     type:'bar',
@@ -126,7 +258,6 @@ async function cargar(){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}}
   });
 
-  // Top consumidos
   const top = (kpis.mas_consumidos||[]).slice(0,8);
   new Chart(document.getElementById('ch-top'),{
     type:'bar',
@@ -134,59 +265,154 @@ async function cargar(){
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{font:{size:10}}},y:{ticks:{font:{size:9}}}}}
   });
 
-  // Entradas vs Salidas
   const meses = kpis.consumo_mensual||[];
   new Chart(document.getElementById('ch-mes'),{
     type:'bar',
-    data:{
-      labels:meses.map(m=>m.mes),
-      datasets:[
-        {label:'Entradas',data:meses.map(m=>m.entradas||0),backgroundColor:'#0D4F3C',borderRadius:4},
-        {label:'Salidas', data:meses.map(m=>m.salidas||0), backgroundColor:'#ED7D31',borderRadius:4}
-      ]
-    },
+    data:{labels:meses.map(m=>m.mes),datasets:[
+      {label:'Entradas',data:meses.map(m=>m.entradas||0),backgroundColor:'#0D4F3C',borderRadius:4},
+      {label:'Salidas', data:meses.map(m=>m.salidas||0), backgroundColor:'#ED7D31',borderRadius:4}
+    ]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10}}}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:9}}}}}
   });
 
-  // Consumo edificio x producto
   const edProd = kpis.consumo_ed_prod||[];
   const edificios = [...new Set(edProd.map(r=>r.edificio))];
   const prodNames = [...new Set(edProd.map(r=>r.nombre))].slice(0,8);
   const datasets = edificios.map((ed,i)=>({
     label:ed,
     data:prodNames.map(pn=>{const r=edProd.find(x=>x.edificio===ed&&x.nombre===pn); return r?r.total:0;}),
-    backgroundColor:['#0D4F3C','#2E74B5','#7030A0'][i]||COLORS[i],
-    borderRadius:3
+    backgroundColor:['#0D4F3C','#2E74B5','#7030A0'][i]||COLORS[i],borderRadius:3
   }));
   new Chart(document.getElementById('ch-ed-prod'),{
     type:'bar',
     data:{labels:prodNames.map(n=>n.length>15?n.slice(0,13)+'…':n),datasets},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10}}}},scales:{x:{stacked:false,ticks:{font:{size:9}}},y:{beginAtZero:true,ticks:{font:{size:10}}}}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10}}}},scales:{x:{ticks:{font:{size:9}}},y:{beginAtZero:true,ticks:{font:{size:10}}}}}
   });
 
-  // Alertas
   const alertas = kpis.alertas||[];
   document.getElementById('alertas-list').innerHTML = alertas.length
-    ? alertas.map(a=>`
-        <div class="alerta">
-          <div><div class="alerta-nombre">⚠️ ${a.nombre}</div>
-          <div class="alerta-info">${a.categoria} · Mínimo: ${a.stock_minimo} ${a.unidad}</div></div>
-          <div class="alerta-stock">${a.stock_actual} ${a.unidad}</div>
-        </div>`).join('')
-    : '<div class="loading" style="padding:12px">✅ Todos los productos están sobre el stock mínimo</div>';
+    ? alertas.map(a=>`<div class="alerta">
+        <div><div style="font-weight:700;font-size:13px;color:#C00">⚠️ ${a.nombre}</div>
+        <div style="font-size:12px;color:#888">${a.categoria} · Mínimo: ${a.stock_minimo} ${a.unidad}</div></div>
+        <div style="font-size:18px;font-weight:700;color:#C00">${a.stock_actual} ${a.unidad}</div>
+      </div>`).join('')
+    : '<div class="loading" style="padding:12px">✅ Todos los productos sobre el stock mínimo</div>';
 
-  // Tabla top
   document.getElementById('tabla-top').innerHTML = top.map((p,i)=>`
     <tr>
       <td style="font-weight:700;color:#0D4F3C">${i+1}</td>
       <td style="font-weight:600">${p.nombre}</td>
-      <td><span style="background:#E2EFDA;color:#27500A;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600">${p.categoria}</span></td>
+      <td><span class="badge-cat">${p.categoria}</span></td>
       <td style="font-weight:700;color:${p.stock_actual<=0?'#C00':'#0D4F3C'}">${p.stock_actual} ${p.unidad}</td>
       <td style="font-weight:700">${FMT(p.total_salidas)}</td>
     </tr>`).join('');
 }
 
-cargar();
+async function aplicarFiltro(){
+  const mes    = document.getElementById('f-mes').value;
+  const desde  = document.getElementById('f-desde').value;
+  const hasta  = document.getElementById('f-hasta').value;
+  if(!mes && !desde){ alert('Selecciona un mes o una fecha de inicio'); return; }
+
+  let params = new URLSearchParams();
+  let textoFiltro = '';
+  if(mes){
+    params.set('mes', mes);
+    const [mm,yy] = mes.split('-');
+    const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    textoFiltro = `${meses[parseInt(mm)]} ${yy}`;
+  } else {
+    if(desde) params.set('desde', desde.split('-').reverse().join('-'));
+    if(hasta) params.set('hasta', hasta.split('-').reverse().join('-'));
+    textoFiltro = `${desde||'inicio'} al ${hasta||'hoy'}`;
+  }
+
+  const r = await fetch('/api/kpis/filtrado?'+params);
+  const d = await r.json();
+
+  document.getElementById('filtro-badge').style.display='block';
+  document.getElementById('filtro-texto').textContent = 'Filtrando: '+textoFiltro;
+  document.getElementById('seccion-filtro').style.display='block';
+  document.getElementById('filtro-sec-title').textContent = 'Resultados — '+textoFiltro;
+
+  const ent = d.total_entradas||0;
+  const sal = d.total_salidas||0;
+  document.getElementById('r-entradas').textContent = FMT(ent);
+  document.getElementById('r-salidas').textContent  = FMT(sal);
+  document.getElementById('r-diferencia').textContent = FMT(ent-sal);
+
+  // Gráfico edificio filtrado
+  if(chartFEd){ chartFEd.destroy(); }
+  const eds = d.por_edificio||[];
+  chartFEd = new Chart(document.getElementById('ch-f-ed'),{
+    type:'bar',
+    data:{labels:eds.map(e=>e.edificio||'Sin edificio'),datasets:[{label:'Salidas',data:eds.map(e=>e.total||0),backgroundColor:['#0D4F3C','#2E74B5','#7030A0'],borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}}
+  });
+
+  // Gráfico productos filtrado
+  if(chartFProd){ chartFProd.destroy(); }
+  const prods = (d.por_producto||[]).slice(0,10);
+  chartFProd = new Chart(document.getElementById('ch-f-prod'),{
+    type:'bar',
+    data:{labels:prods.map(p=>p.nombre.length>18?p.nombre.slice(0,16)+'…':p.nombre),datasets:[{label:'Unidades',data:prods.map(p=>p.total||0),backgroundColor:prods.map((_,i)=>COLORS[i%COLORS.length]),borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{font:{size:10}}},y:{ticks:{font:{size:9}}}}}
+  });
+
+  // Tabla detalle
+  document.getElementById('tabla-detalle').innerHTML = d.detalle.length
+    ? d.detalle.map(m=>`<tr>
+        <td>${m.fecha||'—'}</td>
+        <td><span class="${m.tipo==='entrada'?'badge-e':'badge-s'}">${m.tipo}</span></td>
+        <td style="font-weight:600">${m.nombre}</td>
+        <td>${FMT(m.cantidad)} ${m.unidad}</td>
+        <td>${m.edificio||'—'}</td>
+        <td style="color:#888">${m.usuario||'—'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" class="loading">Sin movimientos en este período</td></tr>';
+}
+
+function limpiarFiltro(){
+  document.getElementById('f-mes').value='';
+  document.getElementById('f-desde').value='';
+  document.getElementById('f-hasta').value='';
+  document.getElementById('filtro-badge').style.display='none';
+  document.getElementById('seccion-filtro').style.display='none';
+}
+
+// Importar Excel
+let archivoImport = null;
+function previewImport(){
+  const file = document.getElementById('imp-input').files[0];
+  if(!file) return;
+  archivoImport = file;
+  document.getElementById('imp-label').innerHTML = `✅ <strong>${file.name}</strong><br><small style="color:#27500A">${(file.size/1024).toFixed(0)} KB — listo para importar</small>`;
+  document.getElementById('btn-imp').disabled = false;
+}
+
+async function ejecutarImport(){
+  if(!archivoImport) return;
+  const status = document.getElementById('imp-status');
+  const btn = document.getElementById('btn-imp');
+  btn.disabled=true; btn.textContent='Importando...';
+  status.textContent='⏳ Procesando archivo...';
+  const fd = new FormData();
+  fd.append('archivo', archivoImport);
+  const r = await fetch('/api/importar',{method:'POST',body:fd});
+  const d = await r.json();
+  if(d.ok){
+    status.innerHTML=`✅ <strong>${d.creados} productos importados correctamente</strong>`;
+    setTimeout(()=>{
+      document.getElementById('modal-import').classList.remove('show');
+      window.location.reload();
+    },2000);
+  } else {
+    status.innerHTML=`❌ Error: ${d.error}`;
+    btn.disabled=false; btn.textContent='Importar';
+  }
+}
+
+cargarGeneral();
 </script>
 </body>
 </html>
