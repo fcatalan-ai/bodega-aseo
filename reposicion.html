@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orden de Reposición — Bodega Aseo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
+.topbar{background:#0D4F3C;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar h1{font-size:16px;font-weight:700}
+.topbar-links{display:flex;gap:14px;font-size:13px}
+.topbar-links a{color:#A8D5C5;text-decoration:none}
+.topbar-links a:hover{color:#fff}
+.main{padding:20px;max-width:1100px;margin:0 auto}
+.header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+.header-row h2{font-size:18px;font-weight:700;color:#0D4F3C}
+.header-row p{font-size:13px;color:#888;margin-top:4px}
+.btn-export{background:#0D4F3C;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600}
+.btn-export:hover{background:#1a6b52}
+.alerta-banner{background:#FCEBEB;border:1px solid #fcc;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:14px;color:#C00}
+.alerta-banner strong{font-size:20px}
+.sec{font-size:11px;font-weight:700;color:#0D4F3C;text-transform:uppercase;letter-spacing:.05em;margin:20px 0 10px;border-left:4px solid #0D4F3C;padding-left:8px}
+.table-wrap{background:#fff;border-radius:10px;border:1px solid #e5e8ed;overflow:auto;margin-bottom:20px}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:650px}
+th{background:#0D4F3C;color:#fff;padding:10px 14px;text-align:left;font-size:11px;font-weight:600}
+td{padding:10px 14px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#f0f7f4}
+.badge-cat{background:#E6F1FB;color:#0C447C;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+.cant-sugerida{font-size:16px;font-weight:700;color:#C00;background:#FCEBEB;padding:4px 12px;border-radius:20px;display:inline-block}
+.cant-agotado{font-size:16px;font-weight:700;color:#7F0000;background:#FFB3B3;padding:4px 12px;border-radius:20px;display:inline-block}
+.stock-cero{color:#C00;font-weight:700}
+.progress-wrap{display:flex;align-items:center;gap:8px}
+.progress-bg{background:#eee;border-radius:10px;height:8px;width:80px;overflow:hidden;flex-shrink:0}
+.progress-fill{height:100%;border-radius:10px;background:#C00}
+.loading{text-align:center;padding:40px;color:#999}
+.empty{text-align:center;padding:40px;color:#27500A;font-size:15px}
+/* SEMANA */
+.semana-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:700px){.semana-grid{grid-template-columns:1fr}}
+.semana-card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;overflow:hidden}
+.semana-head{padding:12px 16px;font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+.semana-head.actual{background:#E2EFDA;color:#27500A}
+.semana-head.anterior{background:#f0f4f8;color:#555}
+.semana-ed{padding:8px 16px;border-bottom:1px solid #f0f0f0;font-size:12px}
+.semana-ed:last-child{border-bottom:none}
+.semana-ed-name{font-weight:700;color:#0D4F3C;margin-bottom:4px}
+.semana-prod{display:flex;justify-content:space-between;font-size:11px;color:#666;padding:2px 0}
+.semana-total{font-size:12px;font-weight:700;color:#0D4F3C}
+.delta{font-size:11px;font-weight:600}
+.delta-up{color:#C00}
+.delta-dn{color:#27500A}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>🧴 Bodega de Aseo</h1>
+  <div class="topbar-links">
+    <a href="/">📦 Inventario</a>
+    <a href="/dashboard">📊 Dashboard</a>
+    <a href="/movimientos">📋 Movimientos</a>
+    <a href="/reposicion" style="color:#FFD966;font-weight:600">🛒 Reposición</a>
+    <a href="/logout">Salir</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ORDEN DE REPOSICIÓN -->
+  <div class="header-row">
+    <div>
+      <h2>🛒 Orden de Reposición</h2>
+      <p>Productos que requieren reposición inmediata — bajo stock mínimo</p>
+    </div>
+    <button class="btn-export" onclick="window.location='/api/export/reposicion'">
+      📥 Exportar orden a Excel
+    </button>
+  </div>
+
+  <div id="alerta-banner" style="display:none" class="alerta-banner">
+    <span style="font-size:28px">⚠️</span>
+    <div><strong id="alerta-n">0</strong> productos bajo stock mínimo requieren reposición</div>
+  </div>
+
+  <div class="table-wrap" id="tabla-repos-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Producto</th><th>Categoría</th><th>Unidad</th>
+          <th>Stock actual</th><th>Stock mínimo</th>
+          <th>Nivel</th><th>Prom. mensual</th><th>Cantidad a pedir</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-repos"><tr><td colspan="8" class="loading">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- RESUMEN SEMANAL -->
+  <div class="sec">📅 Resumen semanal por edificio</div>
+  <div class="semana-grid">
+    <div class="semana-card">
+      <div class="semana-head actual">
+        <span>📅 Semana actual</span>
+        <span id="sem-act-fechas" style="font-size:11px;font-weight:400"></span>
+      </div>
+      <div id="sem-actual"><div class="loading">Cargando...</div></div>
+    </div>
+    <div class="semana-card">
+      <div class="semana-head anterior">
+        <span>📅 Semana anterior</span>
+        <span id="sem-ant-fechas" style="font-size:11px;font-weight:400"></span>
+      </div>
+      <div id="sem-anterior"><div class="loading">Cargando...</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+async function cargarReposicion(){
+  const r = await fetch('/api/reposicion');
+  const prods = await r.json();
+
+  if(prods.length > 0){
+    document.getElementById('alerta-banner').style.display='flex';
+    document.getElementById('alerta-n').textContent = prods.length;
+  }
+
+  if(!prods.length){
+    document.getElementById('tabla-repos').innerHTML =
+      '<tr><td colspan="8" class="empty">✅ Todos los productos están sobre el stock mínimo</td></tr>';
+    return;
+  }
+
+  document.getElementById('tabla-repos').innerHTML = prods.map(p=>{
+    const pct = p.stock_minimo>0 ? Math.min(100, Math.round(p.stock_actual/p.stock_minimo*100)) : 0;
+    const agotado = p.stock_actual === 0;
+    const prom = Math.round(p.promedio_mensual||0);
+    return `<tr>
+      <td style="font-weight:700;color:#0D4F3C">${p.nombre}</td>
+      <td><span class="badge-cat">${p.categoria}</span></td>
+      <td style="color:#888">${p.unidad}</td>
+      <td class="${agotado?'stock-cero':''}">${p.stock_actual} ${p.unidad}</td>
+      <td style="color:#888">${p.stock_minimo}</td>
+      <td>
+        <div class="progress-wrap">
+          <div class="progress-bg"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <span style="font-size:11px;color:#C00;font-weight:600">${pct}%</span>
+        </div>
+      </td>
+      <td style="color:#555">${prom>0?prom+' '+p.unidad:'—'}</td>
+      <td><span class="${agotado?'cant-agotado':'cant-sugerida'}">${p.cantidad_sugerida} ${p.unidad}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+async function cargarSemanal(){
+  const r = await fetch('/api/resumen-semanal');
+  const d = await r.json();
+
+  document.getElementById('sem-act-fechas').textContent =
+    `${d.semana_actual.desde} — ${d.semana_actual.hasta}`;
+  document.getElementById('sem-ant-fechas').textContent =
+    `${d.semana_anterior.desde} — ${d.semana_anterior.hasta}`;
+
+  function renderSemana(data, elId){
+    const eds = Object.keys(data.por_edificio);
+    const el = document.getElementById(elId);
+    if(!eds.length){
+      el.innerHTML='<div class="loading" style="padding:16px">Sin movimientos esta semana</div>';
+      return;
+    }
+    el.innerHTML = eds.map(ed=>{
+      const info = data.por_edificio[ed];
+      const top3 = info.productos.slice(0,3);
+      return `<div class="semana-ed">
+        <div class="semana-ed-name">🏫 ${ed} <span class="semana-total">(${info.total} unidades)</span></div>
+        ${top3.map(p=>`<div class="semana-prod"><span>${p.nombre}</span><span style="font-weight:600">${p.total} ${p.unidad}</span></div>`).join('')}
+        ${info.productos.length>3?`<div style="font-size:10px;color:#aaa;margin-top:2px">+${info.productos.length-3} productos más</div>`:''}
+      </div>`;
+    }).join('');
+  }
+
+  renderSemana(d.semana_actual, 'sem-actual');
+  renderSemana(d.semana_anterior, 'sem-anterior');
+
+  // Comparar totales
+  const act = d.semana_actual.total;
+  const ant = d.semana_anterior.total;
+  if(ant > 0){
+    const diff = act - ant;
+    const pct = Math.abs(Math.round(diff/ant*100));
+    const delta = diff > 0
+      ? `<span class="delta delta-up">▲ ${pct}% más que semana anterior</span>`
+      : diff < 0
+        ? `<span class="delta delta-dn">▼ ${pct}% menos que semana anterior</span>`
+        : `<span class="delta">= igual que semana anterior</span>`;
+    document.querySelector('.semana-head.actual span:first-child').innerHTML =
+      `📅 Semana actual <br>${delta}`;
+  }
+}
+
+cargarReposicion();
+cargarSemanal();
+</script>
+</body>
+</html>
