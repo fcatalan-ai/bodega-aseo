@@ -91,9 +91,14 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 
   <!-- BOTÓN IMPORTAR -->
   <div style="display:flex;justify-content:flex-end;margin:10px 0">
-    <button class="btn-filtrar" onclick="document.getElementById('modal-import').classList.add('show')">
-      📤 Importar productos desde Excel
-    </button>
+    <div style="display:flex;gap:8px">
+      <button class="btn-filtrar" onclick="document.getElementById('modal-import').classList.add('show')">
+        📤 Importar productos
+      </button>
+      <button class="btn-filtrar" style="background:#27500A" onclick="document.getElementById('modal-import-mov').classList.add('show')">
+        📋 Importar movimientos históricos
+      </button>
+    </div>
   </div>
 
   <!-- FILTRO POR FECHA -->
@@ -102,25 +107,31 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
     <div class="filtro-title">Selecciona un período para analizar entradas y salidas</div>
     <div class="filtro-row">
       <div class="filtro-group">
-        <label>Mes rápido</label>
+        <label>Año</label>
+        <select id="f-anio">
+          <option value="">— Año —</option>
+          <option value="2024">2024</option>
+          <option value="2025">2025</option>
+          <option value="2026">2026</option>
+          <option value="2027">2027</option>
+        </select>
+      </div>
+      <div class="filtro-group">
+        <label>Mes</label>
         <select id="f-mes">
-          <option value="">— Seleccionar mes —</option>
-          <option value="01-2025">Enero 2025</option>
-          <option value="02-2025">Febrero 2025</option>
-          <option value="03-2025">Marzo 2025</option>
-          <option value="04-2025">Abril 2025</option>
-          <option value="05-2025">Mayo 2025</option>
-          <option value="06-2025">Junio 2025</option>
-          <option value="07-2025">Julio 2025</option>
-          <option value="08-2025">Agosto 2025</option>
-          <option value="09-2025">Septiembre 2025</option>
-          <option value="10-2025">Octubre 2025</option>
-          <option value="11-2025">Noviembre 2025</option>
-          <option value="12-2025">Diciembre 2025</option>
-          <option value="01-2026">Enero 2026</option>
-          <option value="02-2026">Febrero 2026</option>
-          <option value="03-2026">Marzo 2026</option>
-          <option value="04-2026">Abril 2026</option>
+          <option value="">— Mes —</option>
+          <option value="01">Enero</option>
+          <option value="02">Febrero</option>
+          <option value="03">Marzo</option>
+          <option value="04">Abril</option>
+          <option value="05">Mayo</option>
+          <option value="06">Junio</option>
+          <option value="07">Julio</option>
+          <option value="08">Agosto</option>
+          <option value="09">Septiembre</option>
+          <option value="10">Octubre</option>
+          <option value="11">Noviembre</option>
+          <option value="12">Diciembre</option>
         </select>
       </div>
       <div style="display:flex;align-items:center;color:#999;font-size:13px;padding-bottom:2px">— o rango —</div>
@@ -309,18 +320,32 @@ async function cargarGeneral(){
 }
 
 async function aplicarFiltro(){
+  const anio   = document.getElementById('f-anio').value;
   const mes    = document.getElementById('f-mes').value;
   const desde  = document.getElementById('f-desde').value;
   const hasta  = document.getElementById('f-hasta').value;
-  if(!mes && !desde){ alert('Selecciona un mes o una fecha de inicio'); return; }
+
+  if(!mes && !anio && !desde){ alert('Selecciona un año, mes o rango de fechas'); return; }
 
   let params = new URLSearchParams();
   let textoFiltro = '';
-  if(mes){
-    params.set('mes', mes);
-    const [mm,yy] = mes.split('-');
-    const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    textoFiltro = `${meses[parseInt(mm)]} ${yy}`;
+  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  if(mes || anio){
+    if(mes && anio){
+      // Mes y año específico
+      params.set('mes', `${mes}-${anio}`);
+      textoFiltro = `${meses[parseInt(mes)]} ${anio}`;
+    } else if(anio && !mes){
+      // Solo año — filtrar todo el año
+      params.set('desde', `01-01-${anio}`);
+      params.set('hasta', `31-12-${anio}`);
+      textoFiltro = `Año ${anio}`;
+    } else if(mes && !anio){
+      // Solo mes — todos los años
+      params.set('solo_mes', mes);
+      textoFiltro = `${meses[parseInt(mes)]} (todos los años)`;
+    }
   } else {
     if(desde) params.set('desde', desde.split('-').reverse().join('-'));
     if(hasta) params.set('hasta', hasta.split('-').reverse().join('-'));
@@ -373,6 +398,7 @@ async function aplicarFiltro(){
 }
 
 function limpiarFiltro(){
+  document.getElementById('f-anio').value='';
   document.getElementById('f-mes').value='';
   document.getElementById('f-desde').value='';
   document.getElementById('f-hasta').value='';
@@ -412,7 +438,63 @@ async function ejecutarImport(){
   }
 }
 
+
+let archivoImportMov = null;
+function previewImportMov(){
+  const file = document.getElementById('imp-mov-input').files[0];
+  if(!file) return;
+  archivoImportMov = file;
+  document.getElementById('imp-mov-label').innerHTML =
+    `✅ <strong>${file.name}</strong><br><small style="color:#27500A">${(file.size/1024).toFixed(0)} KB</small>`;
+  document.getElementById('btn-imp-mov').disabled = false;
+}
+
+async function ejecutarImportMov(){
+  if(!archivoImportMov) return;
+  const status = document.getElementById('imp-mov-status');
+  const btn = document.getElementById('btn-imp-mov');
+  btn.disabled=true; btn.textContent='Importando...';
+  status.textContent='⏳ Procesando...';
+  const fd = new FormData();
+  fd.append('archivo', archivoImportMov);
+  const r = await fetch('/api/importar/movimientos',{method:'POST',body:fd});
+  const d = await r.json();
+  if(d.ok){
+    status.innerHTML=`✅ <strong>${d.creados} movimientos importados</strong>${d.errores.length?'<br>⚠️ '+d.errores.slice(0,3).join('<br>'):''}`;
+    setTimeout(()=>{ document.getElementById('modal-import-mov').classList.remove('show'); location.reload(); },2500);
+  } else {
+    status.innerHTML=`❌ ${d.error}`;
+    btn.disabled=false; btn.textContent='Importar';
+  }
+}
+
 cargarGeneral();
 </script>
+
+<!-- MODAL IMPORTAR MOVIMIENTOS -->
+<div class="modal-bg" id="modal-import-mov">
+  <div class="modal">
+    <h3>📋 Importar movimientos históricos</h3>
+    <p style="font-size:13px;color:#555;margin-bottom:10px">
+      Usa la plantilla <strong>PLANTILLA_MOVIMIENTOS_BODEGA.xlsx</strong><br>
+      Permite cargar entradas y salidas históricas de una vez.
+    </p>
+    <div style="background:#E2EFDA;border-radius:8px;padding:10px;font-size:12px;color:#27500A;margin-bottom:12px">
+      ✅ El stock se actualiza automáticamente con cada movimiento importado<br>
+      ✅ Los productos deben existir previamente en el sistema<br>
+      ✅ Usa exactamente el mismo nombre del producto que en el sistema
+    </div>
+    <div class="upload-area" onclick="document.getElementById('imp-mov-input').click()">
+      <input type="file" id="imp-mov-input" accept=".xlsx,.xls" style="display:none" onchange="previewImportMov()">
+      <div id="imp-mov-label">📋 <strong>Haz click para seleccionar el archivo</strong><br>
+      <small style="color:#888">.xlsx — Hoja MOVIMIENTOS</small></div>
+    </div>
+    <div id="imp-mov-status" style="font-size:13px;margin-top:10px;text-align:center"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="document.getElementById('modal-import-mov').classList.remove('show')">Cancelar</button>
+      <button class="btn-save" style="background:#27500A" id="btn-imp-mov" onclick="ejecutarImportMov()" disabled>Importar</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
