@@ -398,7 +398,9 @@ def importar_excel():
         for row_num in range(4, ws.max_row + 1):
             def gv(col):
                 v = ws.cell(row=row_num, column=col).value
-                return str(v).strip() if v is not None else ''
+                if v is None: return ''
+                if hasattr(v, 'strftime'): return v.strftime('%d-%m-%Y')
+                return str(v).strip()
             nombre   = gv(1)
             categoria= gv(2)
             unidad   = gv(3)
@@ -503,16 +505,19 @@ def get_historial():
     if cat:      sql += " AND p.categoria=?";     params.append(cat)
     if q:        sql += " AND p.nombre LIKE ?";   params.append(f'%{q}%')
     if desde:
-        # desde viene como YYYY-MM-DD, convertir a DD-MM-YYYY para comparar
         parts = desde.split('-')
         if len(parts)==3:
-            desde_fmt = f"{parts[2]}-{parts[1]}-{parts[0]}"
-            sql += " AND m.fecha >= ?"; params.append(desde_fmt)
+            desde_dmy = f"{parts[2]}-{parts[1]}-{parts[0]}"
+            desde_iso = desde  # YYYY-MM-DD
+            sql += " AND (m.fecha >= ? OR m.fecha >= ?)"
+            params += [desde_dmy, desde_iso]
     if hasta:
         parts = hasta.split('-')
         if len(parts)==3:
-            hasta_fmt = f"{parts[2]}-{parts[1]}-{parts[0]}"
-            sql += " AND m.fecha <= ?"; params.append(hasta_fmt)
+            hasta_dmy = f"{parts[2]}-{parts[1]}-{parts[0]}"
+            hasta_iso = hasta
+            sql += " AND (m.fecha <= ? OR m.fecha <= ?)"
+            params += [hasta_dmy, hasta_iso]
     sql += " ORDER BY m.created_at DESC LIMIT 500"
     return jsonify(db_fetchall(sql, params))
 
@@ -605,13 +610,34 @@ def importar_movimientos():
         for row_num in range(4, ws.max_row + 1):
             def gv(col):
                 v = ws.cell(row=row_num, column=col).value
-                return str(v).strip() if v is not None else ''
+                if v is None: return ''
+                return str(v).strip()
+
+            def gv_fecha(col):
+                v = ws.cell(row=row_num, column=col).value
+                if v is None: return ''
+                # Si es objeto datetime de Excel
+                if hasattr(v, 'strftime'):
+                    return v.strftime('%d-%m-%Y')
+                s = str(v).strip()
+                # Si tiene hora: "01 00:00:00-02-2026" -> limpiar
+                import re
+                # Formato YYYY-MM-DD
+                if re.match(r'^\d{4}-\d{2}-\d{2}', s):
+                    parts = s[:10].split('-')
+                    return f"{parts[2]}-{parts[1]}-{parts[0]}"
+                # Formato con hora basura: "DD 00:00:00-MM-YYYY"
+                m = re.match(r'^(\d{1,2})\s+[\d:]+[-](\d{2})[-](\d{4})', s)
+                if m:
+                    return f"{m.group(1).zfill(2)}-{m.group(2)}-{m.group(3)}"
+                # DD-MM-YYYY ya correcto
+                return s
 
             nombre   = gv(1)
             tipo     = gv(2).lower()
             cant_raw = gv(3)
             edificio = gv(4)
-            fecha    = gv(5)
+            fecha    = gv_fecha(5)
             obs      = gv(6)
 
             if not nombre or not tipo or not cant_raw: continue
