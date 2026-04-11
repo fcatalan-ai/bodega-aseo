@@ -708,6 +708,160 @@ def importar_movimientos():
     except Exception as e:
         return jsonify({'error':str(e)}), 500
 
+
+@app.route('/api/resumen-semanal')
+@login_required
+def resumen_semanal():
+    from datetime import datetime, timedelta
+    hoy = datetime.now()
+    # Semana actual: lunes a hoy
+    lunes_actual = hoy - timedelta(days=hoy.weekday())
+    lunes_anterior = lunes_actual - timedelta(days=7)
+    domingo_anterior = lunes_actual - timedelta(days=1)
+
+    def fmt(d): return d.strftime('%d-%m-%Y')
+
+    def consumo_semana(desde, hasta):
+        # Buscar en ambos formatos de fecha
+        desde_num = desde.strftime('%Y%m%d')
+        hasta_num = hasta.strftime('%Y%m%d')
+        sql = """SELECT m.edificio, p.nombre, p.unidad, SUM(m.cantidad) as total
+                 FROM movimientos m JOIN productos p ON m.producto_id=p.id
+                 WHERE m.tipo='salida'
+                 AND (CASE WHEN SUBSTR(m.fecha,3,1)='-'
+                      THEN SUBSTR(m.fecha,7,4)||SUBSTR(m.fecha,4,2)||SUBSTR(m.fecha,1,2)
+                      ELSE REPLACE(SUBSTR(m.fecha,1,10),'-','')
+                      END) BETWEEN ? AND ?
+                 GROUP BY m.edificio, p.nombre, p.unidad
+                 ORDER BY m.edificio, total DESC"""
+        return db_fetchall(sql, (desde_num, hasta_num))
+
+    actual  = consumo_semana(lunes_actual, hoy)
+    anterior= consumo_semana(lunes_anterior, domingo_anterior)
+
+    # Totales por edificio
+    def por_edificio(rows):
+        result = {}
+        for r in rows:
+            ed = r['edificio'] or 'Sin edificio'
+            if ed not in result:
+                result[ed] = {'total': 0, 'productos': []}
+            result[ed]['total'] += r['total']
+            result[ed]['productos'].append({
+                'nombre': r['nombre'],
+                'total': r['total'],
+                'unidad': r['unidad']
+            })
+        return result
+
+    return jsonify({
+        'semana_actual':   {
+            'desde': fmt(lunes_actual),
+            'hasta': fmt(hoy),
+            'por_edificio': por_edificio(actual),
+            'total': sum(r['total'] for r in actual)
+        },
+        'semana_anterior': {
+            'desde': fmt(lunes_anterior),
+            'hasta': fmt(domingo_anterior),
+            'por_edificio': por_edificio(anterior),
+            'total': sum(r['total'] for r in anterior)
+        }
+    })
+
+@app.route('/reposicion')
+@login_required
+def reposicion_page():
+    return render_template('reposicion.html', user=session['user'], rol=session['rol'])
+
+@app.route('/api/reposicion')
+@login_required
+def get_reposicion():
+    # Productos bajo stock minimo
+    bajo = db_fetchall(
+        """SELECT p.*, 
+                  COALESCE((SELECT SUM(cantidad) FROM movimientos 
+                            WHERE producto_id=p.id AND tipo='salida'), 0) as total_salidas,
+                  COALESCE((SELECT AVG(mes_cant) FROM (
+                      SELECT SUM(cantidad) as mes_cant
+                      FROM movimientos
+                      WHERE producto_id=p.id AND tipo='salida'
+                      GROUP BY SUBSTR(fecha,4,2)||SUBSTR(fecha,7,4)
+                  ) t), 0) as promedio_mensual
+           FROM productos p
+           WHERE p.activo=TRUE AND p.stock_minimo > 0
+             AND p.stock_actual <= p.stock_minimo
+           ORDER BY (p.stock_actual * 1.0 / NULLIF(p.stock_minimo,0)) ASC""")
+    
+    # Agregar cantidad sugerida = promedio mensual - stock actual (minimo 0)
+    for p in bajo:
+        sugerido = max(0, round((p['promedio_mensual'] or p['stock_minimo']) - p['stock_actual']))
+        if sugerido == 0:
+            sugerido = p['stock_minimo'] - p['stock_actual']
+        p['cantidad_sugerida'] = max(sugerido, p['stock_minimo'])
+    
+    return jsonify(bajo)
+
+@app.route('/api/export/reposicion')
+@login_required
+def export_reposicion():
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from datetime import datetime
+    
+    bajo = db_fetchall(
+        """SELECT p.nombre, p.categoria, p.unidad, p.stock_actual, p.stock_minimo,
+                  COALESCE((SELECT AVG(mes_cant) FROM (
+                      SELECT SUM(cantidad) as mes_cant
+                      FROM movimientos
+                      WHERE producto_id=p.id AND tipo='salida'
+                      GROUP BY SUBSTR(fecha,4,2)||SUBSTR(fecha,7,4)
+                  ) t), 0) as promedio_mensual
+           FROM productos p
+           WHERE p.activo=TRUE AND p.stock_minimo > 0
+             AND p.stock_actual <= p.stock_minimo
+           ORDER BY p.categoria, p.nombre""")
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Orden de Reposición"
+    ws.sheet_view.showGridLines = False
+
+    # Título
+    ws.merge_cells("A1:G1")
+    c = ws["A1"]
+    c.value = f"ORDEN DE REPOSICIÓN — Bodega de Aseo — {datetime.now().strftime('%d-%m-%Y')}"
+    c.font = Font(bold=True, size=13, color="FFFFFF")
+    c.fill = PatternFill("solid", start_color="0D4F3C", fgColor="0D4F3C")
+    c.alignment = Alignment(horizontal="center")
+    ws.row_dimensions[1].height = 28
+
+    headers = ["Producto","Categoría","Unidad","Stock actual","Stock mínimo","Prom. mensual","Cantidad a pedir"]
+    for col,h in enumerate(headers,1):
+        cell = ws.cell(row=2,column=col,value=h)
+        cell.font = Font(bold=True,color="FFFFFF")
+        cell.fill = PatternFill("solid",start_color="1a6b52",fgColor="1a6b52")
+        cell.alignment = Alignment(horizontal="center")
+        ws.column_dimensions[ws.cell(row=2,column=col).column_letter].width = 18
+
+    for ri,p in enumerate(bajo,3):
+        prom = round(p['promedio_mensual'] or 0)
+        sugerido = max(p['stock_minimo'] - p['stock_actual'], prom)
+        bg = "FCEBEB" if p['stock_actual'] == 0 else "FFF2CC"
+        for col,val in enumerate([p['nombre'],p['categoria'],p['unidad'],
+                                   p['stock_actual'],p['stock_minimo'],prom,sugerido],1):
+            cell = ws.cell(row=ri,column=col,value=val)
+            cell.fill = PatternFill("solid",start_color=bg,fgColor=bg)
+            if col==7:
+                cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal="center" if col>1 else "left")
+
+    buf = io.BytesIO()
+    wb.save(buf); buf.seek(0)
+    return send_file(buf, download_name=f'orden_reposicion_{datetime.now().strftime("%d%m%Y")}.xlsx',
+                     as_attachment=True,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
 if __name__=='__main__':
     init_db()
     app.run(debug=False,host='0.0.0.0',port=int(os.environ.get('PORT',5000)))
