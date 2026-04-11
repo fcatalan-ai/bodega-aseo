@@ -633,6 +633,18 @@ def importar_movimientos():
                     errores.append(f"Fila {row_num}: stock insuficiente para '{nombre}' (hay {prod['stock_actual']})")
                     continue
 
+                # Normalizar fecha a DD-MM-YYYY
+                fecha_norm = fecha
+                if fecha:
+                    import re
+                    # Si viene como YYYY-MM-DD convertir
+                    if re.match(r'\d{4}-\d{2}-\d{2}', str(fecha)):
+                        parts = str(fecha).split('-')
+                        fecha_norm = f"{parts[2]}-{parts[1]}-{parts[0]}"
+                    # Si viene como datetime object
+                    elif hasattr(fecha, 'strftime'):
+                        fecha_norm = fecha.strftime('%d-%m-%Y')
+
                 conn2, mode2 = get_db()
                 cur2 = conn2.cursor()
                 delta = cant if tipo == 'entrada' else -cant
@@ -640,14 +652,14 @@ def importar_movimientos():
                 if mode2 == 'pg':
                     cur2.execute(
                         "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-                        (prod['id'], tipo, cant, edificio, usu, obs, fecha))
+                        (prod['id'], tipo, cant, edificio, usu, obs, fecha_norm))
                     cur2.execute(
                         "UPDATE productos SET stock_actual=stock_actual+%s WHERE id=%s",
                         (delta, prod['id']))
                 else:
                     cur2.execute(
                         "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (?,?,?,?,?,?,?)",
-                        (prod['id'], tipo, cant, edificio, usu, obs, fecha))
+                        (prod['id'], tipo, cant, edificio, usu, obs, fecha_norm))
                     cur2.execute(
                         "UPDATE productos SET stock_actual=stock_actual+? WHERE id=?",
                         (delta, prod['id']))
