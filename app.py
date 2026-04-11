@@ -581,6 +581,86 @@ def eliminar_movimiento(mid):
     conn2.close()
     return jsonify({'ok': True})
 
+
+@app.route('/api/importar/movimientos', methods=['POST'])
+@login_required
+def importar_movimientos():
+    if 'archivo' not in request.files:
+        return jsonify({'error':'No se envió archivo'}), 400
+    file = request.files['archivo']
+    if not file.filename.lower().endswith(('.xlsx','.xls')):
+        return jsonify({'error':'Solo se aceptan archivos Excel (.xlsx)'}), 400
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(file.read()), data_only=True)
+        ws = None
+        for name in wb.sheetnames:
+            if 'MOV' in name.upper():
+                ws = wb[name]; break
+        if ws is None: ws = wb.active
+
+        # Columnas: A=Producto, B=Tipo, C=Cantidad, D=Edificio, E=Fecha, F=Observacion
+        creados = 0
+        errores = []
+        for row_num in range(4, ws.max_row + 1):
+            def gv(col):
+                v = ws.cell(row=row_num, column=col).value
+                return str(v).strip() if v is not None else ''
+
+            nombre   = gv(1)
+            tipo     = gv(2).lower()
+            cant_raw = gv(3)
+            edificio = gv(4)
+            fecha    = gv(5)
+            obs      = gv(6)
+
+            if not nombre or not tipo or not cant_raw: continue
+            if tipo not in ('entrada','salida'): continue
+
+            try:
+                cant = int(float(cant_raw))
+                if cant <= 0: continue
+
+                # Buscar producto por nombre
+                prod = db_fetchone(
+                    "SELECT id, stock_actual FROM productos WHERE LOWER(nombre)=LOWER(?)", (nombre,))
+                if not prod:
+                    errores.append(f"Fila {row_num}: producto '{nombre}' no encontrado")
+                    continue
+
+                # Verificar stock en salida
+                if tipo == 'salida' and prod['stock_actual'] < cant:
+                    errores.append(f"Fila {row_num}: stock insuficiente para '{nombre}' (hay {prod['stock_actual']})")
+                    continue
+
+                conn2, mode2 = get_db()
+                cur2 = conn2.cursor()
+                delta = cant if tipo == 'entrada' else -cant
+                usu = session['user']
+                if mode2 == 'pg':
+                    cur2.execute(
+                        "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                        (prod['id'], tipo, cant, edificio, usu, obs, fecha))
+                    cur2.execute(
+                        "UPDATE productos SET stock_actual=stock_actual+%s WHERE id=%s",
+                        (delta, prod['id']))
+                else:
+                    cur2.execute(
+                        "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (?,?,?,?,?,?,?)",
+                        (prod['id'], tipo, cant, edificio, usu, obs, fecha))
+                    cur2.execute(
+                        "UPDATE productos SET stock_actual=stock_actual+? WHERE id=?",
+                        (delta, prod['id']))
+                conn2.commit()
+                conn2.close()
+                creados += 1
+            except Exception as e:
+                errores.append(f"Fila {row_num}: {str(e)}")
+
+        return jsonify({'ok':True,'creados':creados,'errores':errores})
+    except Exception as e:
+        return jsonify({'error':str(e)}), 500
+
 if __name__=='__main__':
     init_db()
     app.run(debug=False,host='0.0.0.0',port=int(os.environ.get('PORT',5000)))
