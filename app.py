@@ -78,7 +78,7 @@ def init_db():
     if mode == 'pg':
         cur.execute("INSERT INTO usuarios (nombre,email,password,rol,edificio) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (email) DO NOTHING",
             ('Bodega', os.environ.get('ADMIN_EMAIL','bodega@colegio.cl'),
-             os.environ.get('ADMIN_PASS','bodega2025'), 'admin', ''))
+             os.environ.get('ADMIN_PASS','bodegacct2026'), 'admin', ''))
     else:
         cur.execute("INSERT OR IGNORE INTO usuarios (nombre,email,password,rol,edificio) VALUES (?,?,?,?,?)",
             ('Bodega', os.environ.get('ADMIN_EMAIL','bodega@colegio.cl'),
