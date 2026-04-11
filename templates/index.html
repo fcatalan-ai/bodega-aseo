@@ -84,6 +84,7 @@ tr:hover td{background:#f0f7f4}
   <div class="topbar-links">
     <span>🧴 Bodega de Aseo</span>
     <a href="/dashboard" class="dash">📊 Dashboard</a>
+    <a href="/movimientos" style="color:#A8D5C5">📋 Movimientos</a>
     <a href="/logout">Salir</a>
   </div>
 </div>
@@ -103,7 +104,7 @@ tr:hover td{background:#f0f7f4}
       {% for c in categorias %}<option>{{ c }}</option>{% endfor %}
     </select>
     <button class="btn-out" onclick="window.location='/api/export/stock'">📥 Stock Excel</button>
-    <button class="btn-out" onclick="window.location='/api/export/movimientos'">📥 Movimientos</button>
+    <button class="btn-out" onclick="window.location='/movimientos'">📋 Ver Movimientos</button>
     <button class="btn-green" onclick="abrirModalProducto()">+ Producto</button>
   </div>
 
