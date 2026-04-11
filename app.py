@@ -507,17 +507,26 @@ def get_historial():
     if desde:
         parts = desde.split('-')
         if len(parts)==3:
-            desde_dmy = f"{parts[2]}-{parts[1]}-{parts[0]}"
-            desde_iso = desde  # YYYY-MM-DD
-            sql += " AND (m.fecha >= ? OR m.fecha >= ?)"
-            params += [desde_dmy, desde_iso]
+            yyyy,mm,dd = parts
+            # Convertir fecha de la BD a YYYYMMDD para comparar numéricamente
+            # DD-MM-YYYY -> YYYYMMDD: substr(7,4)||substr(4,2)||substr(1,2)
+            # YYYY-MM-DD -> YYYYMMDD: replace('-','')
+            desde_num = yyyy+mm+dd
+            sql += (" AND (CASE WHEN SUBSTR(m.fecha,3,1)='-'"
+                    " THEN SUBSTR(m.fecha,7,4)||SUBSTR(m.fecha,4,2)||SUBSTR(m.fecha,1,2)"
+                    " ELSE REPLACE(SUBSTR(m.fecha,1,10),'-','')"
+                    " END) >= ?")
+            params.append(desde_num)
     if hasta:
         parts = hasta.split('-')
         if len(parts)==3:
-            hasta_dmy = f"{parts[2]}-{parts[1]}-{parts[0]}"
-            hasta_iso = hasta
-            sql += " AND (m.fecha <= ? OR m.fecha <= ?)"
-            params += [hasta_dmy, hasta_iso]
+            yyyy,mm,dd = parts
+            hasta_num = yyyy+mm+dd
+            sql += (" AND (CASE WHEN SUBSTR(m.fecha,3,1)='-'"
+                    " THEN SUBSTR(m.fecha,7,4)||SUBSTR(m.fecha,4,2)||SUBSTR(m.fecha,1,2)"
+                    " ELSE REPLACE(SUBSTR(m.fecha,1,10),'-','')"
+                    " END) <= ?")
+            params.append(hasta_num)
     sql += " ORDER BY m.created_at DESC LIMIT 500"
     return jsonify(db_fetchall(sql, params))
 
