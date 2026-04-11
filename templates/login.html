@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bodega Aseo — Acceso</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#0D4F3C;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border-radius:14px;padding:36px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,0.2)}
+.logo{text-align:center;margin-bottom:24px}
+.logo h1{font-size:22px;color:#0D4F3C;font-weight:700;margin-top:8px}
+.logo p{font-size:13px;color:#888;margin-top:4px}
+label{font-size:13px;color:#555;display:block;margin-bottom:4px;margin-top:14px}
+input{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px}
+input:focus{outline:none;border-color:#0D4F3C}
+.btn{width:100%;padding:12px;background:#0D4F3C;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;margin-top:20px}
+.btn:hover{background:#1a6b52}
+.error{color:#c00;font-size:13px;margin-top:12px;text-align:center;background:#fff0f0;padding:8px;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div style="font-size:48px">🧴</div>
+    <h1>Bodega de Aseo</h1>
+    <p>Control de Inventario — Colegio 2025</p>
+  </div>
+  <form method="POST">
+    <label>Correo electrónico</label>
+    <input type="email" name="email" placeholder="usuario@colegio.cl" required autofocus>
+    <label>Contraseña</label>
+    <input type="password" name="password" placeholder="••••••••" required>
+    <button class="btn" type="submit">Ingresar</button>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  </form>
+</div>
+</body>
+</html>

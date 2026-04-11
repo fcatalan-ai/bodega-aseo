@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bodega Aseo — Inventario</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
+.topbar{background:#0D4F3C;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar h1{font-size:16px;font-weight:700}
+.topbar-links{display:flex;align-items:center;gap:14px;font-size:13px}
+.topbar-links a{color:#A8D5C5;text-decoration:none}
+.topbar-links a:hover{color:#fff}
+.topbar-links a.dash{color:#FFD966;font-weight:600}
+.main{padding:16px;max-width:1300px;margin:0 auto}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:#fff;border-radius:10px;padding:14px 16px;text-align:center;border:1px solid #e5e8ed}
+.stat-n{font-size:26px;font-weight:700;color:#0D4F3C}
+.stat-n.alert{color:#C00}
+.stat-l{font-size:11px;color:#888;margin-top:3px}
+.toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.toolbar input,.toolbar select{padding:8px 11px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff;flex:1;min-width:120px}
+.btn-green{background:#0D4F3C;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap}
+.btn-green:hover{background:#1a6b52}
+.btn-out{background:#fff;color:#0D4F3C;border:1px solid #0D4F3C;padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap}
+.btn-out:hover{background:#f0f7f4}
+.table-wrap{background:#fff;border-radius:10px;border:1px solid #e5e8ed;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
+th{background:#0D4F3C;color:#fff;padding:9px 12px;text-align:left;font-size:11px;font-weight:600}
+td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#f0f7f4}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-ok{background:#E2EFDA;color:#27500A}
+.badge-low{background:#FCEBEB;color:#791F1F}
+.badge-cat{background:#E6F1FB;color:#0C447C}
+.btn-sm{padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid #ddd;background:#f8f8f8}
+.btn-sm:hover{background:#e8ecf0}
+/* PANEL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:99;display:none}
+.overlay.show{display:block}
+.panel{position:fixed;top:0;right:-460px;width:440px;max-width:100vw;height:100vh;background:#fff;border-left:1px solid #e0e4e9;overflow-y:auto;transition:right 0.25s;z-index:100;display:flex;flex-direction:column}
+.panel.open{right:0}
+.panel-head{background:#0D4F3C;color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.panel-head h3{font-size:15px;font-weight:700;color:#fff}
+.panel-close{background:none;border:none;color:#fff;font-size:22px;cursor:pointer}
+.panel-body{padding:16px;flex:1}
+.tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid #eee;padding-bottom:8px}
+.tab{padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;border:none;background:none;color:#888}
+.tab.active{background:#E2EFDA;color:#27500A;font-weight:600}
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.field-box label{font-size:10px;color:#999;text-transform:uppercase;display:block;margin-bottom:3px}
+.field-box .val{font-size:15px;font-weight:700;color:#1a1a1a}
+.divider{height:1px;background:#f0f0f0;margin:12px 0}
+.mov-item{padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:12px}
+.mov-item:last-child{border-bottom:none}
+.mov-tipo-e{color:#27500A;font-weight:700;font-size:10px;text-transform:uppercase}
+.mov-tipo-s{color:#C00;font-weight:700;font-size:10px;text-transform:uppercase}
+.section-lbl{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+/* MODALES */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;margin:16px}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:16px;color:#0D4F3C}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.form-group label{font-size:12px;color:#666;display:block;margin-bottom:4px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:#0D4F3C}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.btn-cancel{padding:8px 18px;border-radius:7px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:13px}
+.btn-save{padding:8px 20px;border-radius:7px;border:none;background:#0D4F3C;color:#fff;cursor:pointer;font-size:13px}
+.btn-save:hover{background:#1a6b52}
+.btn-entrada{background:#27500A;color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:13px;cursor:pointer;flex:1}
+.btn-salida{background:#C00;color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:13px;cursor:pointer;flex:1}
+.stock-bar-bg{background:#eee;border-radius:10px;height:8px;margin-top:6px;overflow:hidden}
+.stock-bar-fill{height:100%;border-radius:10px;background:#0D4F3C}
+.loading{text-align:center;padding:30px;color:#999;font-size:13px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>🧴 Bodega de Aseo — Colegio</h1>
+  <div class="topbar-links">
+    <span>🧴 Bodega de Aseo</span>
+    <a href="/dashboard" class="dash">📊 Dashboard</a>
+    <a href="/logout">Salir</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="stats" id="stats-row">
+    <div class="stat"><div class="stat-n">—</div><div class="stat-l">Productos</div></div>
+    <div class="stat"><div class="stat-n alert">—</div><div class="stat-l">Bajo mínimo</div></div>
+    <div class="stat"><div class="stat-n">—</div><div class="stat-l">Total entradas</div></div>
+    <div class="stat"><div class="stat-n">—</div><div class="stat-l">Total salidas</div></div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="buscar" placeholder="Buscar producto..." oninput="filtrar()">
+    <select id="f-cat" onchange="filtrar()">
+      <option value="">Todas las categorías</option>
+      {% for c in categorias %}<option>{{ c }}</option>{% endfor %}
+    </select>
+    <button class="btn-out" onclick="window.location='/api/export/stock'">📥 Stock Excel</button>
+    <button class="btn-out" onclick="window.location='/api/export/movimientos'">📥 Movimientos</button>
+    <button class="btn-green" onclick="abrirModalProducto()">+ Producto</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Producto</th><th>Categoría</th><th>Stock actual</th>
+          <th>Stock mínimo</th><th>Estado</th><th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-body"><tr><td colspan="6" class="loading">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="cerrarPanel()"></div>
+
+<!-- PANEL LATERAL -->
+<div class="panel" id="panel">
+  <div class="panel-head">
+    <div>
+      <h3 id="p-nombre">—</h3>
+      <div style="font-size:11px;color:#A8D5C5;margin-top:2px" id="p-cat">—</div>
+    </div>
+    <button class="panel-close" onclick="cerrarPanel()">×</button>
+  </div>
+  <div class="panel-body">
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('info',this)">Info</button>
+      <button class="tab" onclick="showTab('movimientos',this)">Movimientos</button>
+    </div>
+
+    <div id="tab-info">
+      <div class="field-grid">
+        <div class="field-box"><label>Stock actual</label><div class="val" id="p-stock" style="color:#0D4F3C"></div></div>
+        <div class="field-box"><label>Stock mínimo</label><div class="val" id="p-minimo"></div></div>
+        <div class="field-box"><label>Unidad</label><div class="val" id="p-unidad"></div></div>
+        <div class="field-box"><label>Estado</label><div id="p-estado"></div></div>
+      </div>
+      <div id="p-bar-wrap" style="margin-bottom:14px">
+        <div style="font-size:11px;color:#999;margin-bottom:4px">Nivel de stock</div>
+        <div class="stock-bar-bg"><div class="stock-bar-fill" id="p-bar" style="width:0%"></div></div>
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn-entrada" onclick="abrirMovimiento('entrada')">📥 Entrada</button>
+        <button class="btn-salida" onclick="abrirMovimiento('salida')">📤 Salida</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-sm" style="flex:1" onclick="abrirEditarProducto()">✏️ Editar</button>
+        <button class="btn-sm" style="flex:1;color:#c00;border-color:#fcc" onclick="eliminarProducto()">🗑️ Eliminar</button>
+      </div>
+    </div>
+
+    <div id="tab-movimientos" style="display:none">
+      <div class="section-lbl">Últimos 50 movimientos</div>
+      <div id="mov-list"><div class="loading">Cargando...</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MOVIMIENTO -->
+<div class="modal-bg" id="modal-mov">
+  <div class="modal">
+    <h3 id="mov-title">Registrar movimiento</h3>
+    <input type="hidden" id="mov-tipo">
+    <div class="form-row">
+      <div class="form-group"><label>Fecha *</label><input id="mov-fecha" type="date"></div>
+      <div class="form-group"><label>Cantidad *</label><input id="mov-cant" type="number" min="1" placeholder="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Edificio *</label>
+        <select id="mov-edificio">
+          {% for e in edificios %}<option value="{{ e }}"{% if edificio==e %} selected{% endif %}>{{ e }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group"><label>Observación</label><input id="mov-obs" placeholder="Opcional"></div>
+    </div>
+    <div id="mov-stock-info" style="background:#f0f7f4;border-radius:8px;padding:10px;font-size:13px;margin-bottom:4px"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cerrarModal('modal-mov')">Cancelar</button>
+      <button class="btn-save" id="btn-guardar-mov" onclick="guardarMovimiento()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PRODUCTO -->
+<div class="modal-bg" id="modal-producto">
+  <div class="modal">
+    <h3 id="prod-title">Nuevo Producto</h3>
+    <input type="hidden" id="prod-id">
+    <div class="form-group" style="margin-bottom:12px"><label>Nombre *</label><input id="prod-nombre" placeholder="Ej: Cloro 10L"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Categoría</label>
+        <select id="prod-cat">
+          {% for c in categorias %}<option>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group"><label>Unidad</label>
+        <select id="prod-unidad">
+          <option>unidades</option><option>litros</option><option>kilos</option>
+          <option>rollos</option><option>pares</option><option>paquetes</option><option>cajas</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Stock actual</label><input id="prod-stock" type="number" min="0" value="0"></div>
+      <div class="form-group"><label>Stock mínimo (alerta)</label><input id="prod-minimo" type="number" min="0" value="0"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cerrarModal('modal-producto')">Cancelar</button>
+      <button class="btn-save" onclick="guardarProducto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+let productos = [], productoActual = null;
+
+async function cargarStats(){
+  const r = await fetch('/api/stats');
+  const d = await r.json();
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat"><div class="stat-n">${d.total_productos}</div><div class="stat-l">Productos</div></div>
+    <div class="stat"><div class="stat-n alert">${d.bajo_minimo}</div><div class="stat-l">Bajo mínimo ⚠️</div></div>
+    <div class="stat"><div class="stat-n">${(d.total_entradas||0).toLocaleString('es-CL')}</div><div class="stat-l">Total entradas</div></div>
+    <div class="stat"><div class="stat-n">${(d.total_salidas||0).toLocaleString('es-CL')}</div><div class="stat-l">Total salidas</div></div>`;
+}
+
+async function cargarProductos(params=''){
+  const r = await fetch('/api/productos?'+params);
+  productos = await r.json();
+  renderTabla();
+}
+
+function filtrar(){
+  const q = document.getElementById('buscar').value;
+  const cat = document.getElementById('f-cat').value;
+  cargarProductos(new URLSearchParams({q,categoria:cat}).toString());
+}
+
+function renderTabla(){
+  if(!productos.length){
+    document.getElementById('tabla-body').innerHTML='<tr><td colspan="6" class="loading">No se encontraron productos</td></tr>';
+    return;
+  }
+  document.getElementById('tabla-body').innerHTML = productos.map(p=>{
+    const bajo = p.stock_minimo>0 && p.stock_actual<=p.stock_minimo;
+    return `<tr>
+      <td style="font-weight:600;color:#0D4F3C">${p.nombre}</td>
+      <td><span class="badge badge-cat">${p.categoria||'—'}</span></td>
+      <td style="font-weight:700;font-size:15px;color:${bajo?'#C00':'#0D4F3C'}">${p.stock_actual} <small style="font-weight:400;font-size:11px;color:#888">${p.unidad}</small></td>
+      <td style="color:#888">${p.stock_minimo||'—'}</td>
+      <td><span class="badge ${bajo?'badge-low':'badge-ok'}">${bajo?'⚠️ Bajo mínimo':'✅ OK'}</span></td>
+      <td><button class="btn-sm" onclick="abrirPanel(${p.id})">Ver</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function abrirPanel(id){
+  const r = await fetch('/api/productos/'+id);
+  const d = await r.json();
+  productoActual = d.producto;
+  const p = d.producto;
+  const bajo = p.stock_minimo>0 && p.stock_actual<=p.stock_minimo;
+  document.getElementById('p-nombre').textContent = p.nombre;
+  document.getElementById('p-cat').textContent = p.categoria+' — '+p.unidad;
+  document.getElementById('p-stock').textContent = p.stock_actual+' '+p.unidad;
+  document.getElementById('p-minimo').textContent = p.stock_minimo||'Sin definir';
+  document.getElementById('p-unidad').textContent = p.unidad;
+  document.getElementById('p-estado').innerHTML = `<span class="badge ${bajo?'badge-low':'badge-ok'}">${bajo?'⚠️ Bajo mínimo':'✅ OK'}</span>`;
+  const pct = p.stock_minimo>0 ? Math.min(100, Math.round(p.stock_actual/p.stock_minimo*100)) : 100;
+  document.getElementById('p-bar').style.width = pct+'%';
+  document.getElementById('p-bar').style.background = bajo?'#C00':'#0D4F3C';
+  // Movimientos
+  document.getElementById('mov-list').innerHTML = d.movimientos.length
+    ? d.movimientos.map(m=>`
+        <div class="mov-item">
+          <div class="mov-tipo-${m.tipo}">${m.tipo==='entrada'?'📥 ENTRADA':'📤 SALIDA'} — ${m.cantidad} ${p.unidad}</div>
+          <div style="color:#555;margin-top:2px">${m.edificio?m.edificio+' · ':''} ${m.observacion||''}</div>
+          <div style="color:#aaa;font-size:11px;margin-top:2px">${m.fecha||''} · ${m.usuario}</div>
+        </div>`).join('')
+    : '<div class="loading">Sin movimientos</div>';
+  showTab('info', document.querySelector('.tab'));
+  document.getElementById('panel').classList.add('open');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function cerrarPanel(){
+  document.getElementById('panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+function showTab(tab, btn){
+  ['info','movimientos'].forEach(t=>document.getElementById('tab-'+t).style.display=t===tab?'block':'none');
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  else document.querySelectorAll('.tab')[0].classList.add('active');
+}
+
+function abrirMovimiento(tipo){
+  if(!productoActual) return;
+  document.getElementById('mov-tipo').value = tipo;
+  document.getElementById('mov-title').textContent = tipo==='entrada'?'📥 Registrar Entrada':'📤 Registrar Salida';
+  document.getElementById('mov-title').style.color = tipo==='entrada'?'#27500A':'#C00';
+  document.getElementById('mov-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('mov-cant').value = '';
+  document.getElementById('mov-obs').value = '';
+  document.getElementById('btn-guardar-mov').style.background = tipo==='entrada'?'#27500A':'#C00';
+  document.getElementById('mov-stock-info').innerHTML =
+    `Stock actual: <strong>${productoActual.stock_actual} ${productoActual.unidad}</strong>` +
+    (tipo==='salida'?` · Mínimo: <strong>${productoActual.stock_minimo}</strong>`:'');
+  document.getElementById('mov-edificio').disabled = false;
+  document.getElementById('modal-mov').classList.add('show');
+}
+
+async function guardarMovimiento(){
+  if(!productoActual) return;
+  const cant = parseInt(document.getElementById('mov-cant').value);
+  if(!cant || cant<=0){ alert('Ingresa una cantidad válida'); return; }
+  const data = {
+    producto_id: productoActual.id,
+    tipo: document.getElementById('mov-tipo').value,
+    cantidad: cant,
+    edificio: document.getElementById('mov-edificio').value,
+    observacion: document.getElementById('mov-obs').value,
+    fecha: document.getElementById('mov-fecha').value,
+  };
+  const r = await fetch('/api/movimientos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  const d = await r.json();
+  if(d.error){ alert('Error: '+d.error); return; }
+  cerrarModal('modal-mov');
+  cargarStats(); filtrar();
+  abrirPanel(productoActual.id);
+}
+
+function abrirModalProducto(){
+  document.getElementById('prod-title').textContent = 'Nuevo Producto';
+  document.getElementById('prod-id').value = '';
+  document.getElementById('prod-nombre').value = '';
+  document.getElementById('prod-stock').value = 0;
+  document.getElementById('prod-minimo').value = 0;
+  document.getElementById('modal-producto').classList.add('show');
+}
+
+function abrirEditarProducto(){
+  if(!productoActual) return;
+  const p = productoActual;
+  document.getElementById('prod-title').textContent = 'Editar: '+p.nombre;
+  document.getElementById('prod-id').value = p.id;
+  document.getElementById('prod-nombre').value = p.nombre;
+  document.getElementById('prod-cat').value = p.categoria||'Varios';
+  document.getElementById('prod-unidad').value = p.unidad||'unidades';
+  document.getElementById('prod-stock').value = p.stock_actual||0;
+  document.getElementById('prod-minimo').value = p.stock_minimo||0;
+  document.getElementById('modal-producto').classList.add('show');
+}
+
+async function guardarProducto(){
+  const id = document.getElementById('prod-id').value;
+  const data = {
+    nombre: document.getElementById('prod-nombre').value,
+    categoria: document.getElementById('prod-cat').value,
+    unidad: document.getElementById('prod-unidad').value,
+    stock_actual: parseInt(document.getElementById('prod-stock').value)||0,
+    stock_minimo: parseInt(document.getElementById('prod-minimo').value)||0,
+  };
+  if(!data.nombre){ alert('El nombre es obligatorio'); return; }
+  const url = id ? '/api/productos/'+id : '/api/productos';
+  const method = id ? 'PUT' : 'POST';
+  const r = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  const d = await r.json();
+  cerrarModal('modal-producto');
+  cargarStats(); filtrar();
+  if(!id && d.id) abrirPanel(d.id);
+}
+
+async function eliminarProducto(){
+  if(!productoActual) return;
+  if(!confirm(`¿Eliminar "${productoActual.nombre}"?`)) return;
+  await fetch('/api/productos/'+productoActual.id,{method:'DELETE'});
+  cerrarPanel(); cargarStats(); filtrar();
+}
+
+function cerrarModal(id){ document.getElementById(id).classList.remove('show'); }
+
+cargarStats();
+cargarProductos();
+</script>
+</body>
+</html>
