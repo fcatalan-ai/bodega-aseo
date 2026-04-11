@@ -373,6 +373,113 @@ def export_movimientos():
 # ── USUARIOS ──────────────────────────────────────────────────────────────────
 
 
+
+@app.route('/api/importar', methods=['POST'])
+@login_required
+def importar_excel():
+    if 'archivo' not in request.files:
+        return jsonify({'error':'No se envió archivo'}), 400
+    file = request.files['archivo']
+    if not file.filename.lower().endswith(('.xlsx','.xls')):
+        return jsonify({'error':'Solo se aceptan archivos Excel (.xlsx)'}), 400
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(file.read()), data_only=True)
+        # Buscar hoja PRODUCTOS
+        ws = None
+        for name in wb.sheetnames:
+            if 'PROD' in name.upper():
+                ws = wb[name]; break
+        if ws is None: ws = wb.active
+
+        # Columnas fijas: A=Nombre, B=Categoria, C=Unidad, D=Stock actual, E=Stock minimo
+        creados = 0
+        errores = []
+        for row_num in range(4, ws.max_row + 1):
+            def gv(col):
+                v = ws.cell(row=row_num, column=col).value
+                return str(v).strip() if v is not None else ''
+            nombre   = gv(1)
+            categoria= gv(2)
+            unidad   = gv(3)
+            if not nombre or not categoria: continue
+            try:
+                stock   = int(float(gv(4))) if gv(4) else 0
+                minimo  = int(float(gv(5))) if gv(5) else 0
+                conn2, mode2 = get_db()
+                cur2 = conn2.cursor()
+                if mode2 == 'pg':
+                    cur2.execute(
+                        "INSERT INTO productos (nombre,categoria,unidad,stock_actual,stock_minimo) VALUES (%s,%s,%s,%s,%s)",
+                        (nombre, categoria, unidad or 'unidades', stock, minimo))
+                else:
+                    cur2.execute(
+                        "INSERT INTO productos (nombre,categoria,unidad,stock_actual,stock_minimo) VALUES (?,?,?,?,?)",
+                        (nombre, categoria, unidad or 'unidades', stock, minimo))
+                conn2.commit(); conn2.close()
+                creados += 1
+            except Exception as e:
+                errores.append(f"Fila {row_num}: {str(e)}")
+        return jsonify({'ok':True,'creados':creados,'errores':errores})
+    except Exception as e:
+        return jsonify({'error':str(e)}), 500
+
+@app.route('/api/kpis/filtrado')
+@login_required
+def kpis_filtrado():
+    fecha_desde = request.args.get('desde','')
+    fecha_hasta = request.args.get('hasta','')
+    mes         = request.args.get('mes','')  # formato MM-YYYY
+
+    # Construir filtro de fechas
+    filtro_sql = "WHERE tipo='salida'"
+    params = []
+    if mes:
+        filtro_sql += " AND fecha LIKE ?"
+        params.append(f"%-{mes}")
+    elif fecha_desde and fecha_hasta:
+        filtro_sql += " AND fecha >= ? AND fecha <= ?"
+        params += [fecha_desde, fecha_hasta]
+    elif fecha_desde:
+        filtro_sql += " AND fecha >= ?"
+        params.append(fecha_desde)
+
+    # Total entradas y salidas en periodo
+    filtro_ent = filtro_sql.replace("tipo='salida'","tipo='entrada'")
+    total_sal = db_fetchone(
+        f"SELECT COALESCE(SUM(cantidad),0) as s FROM movimientos {filtro_sql}", params)
+    total_ent = db_fetchone(
+        f"SELECT COALESCE(SUM(cantidad),0) as s FROM movimientos {filtro_ent}", params)
+
+    # Salidas por edificio en periodo
+    por_edificio = db_fetchall(
+        f"""SELECT edificio, SUM(cantidad) as total
+            FROM movimientos {filtro_sql} AND edificio!=''
+            GROUP BY edificio ORDER BY total DESC""", params)
+
+    # Salidas por producto en periodo
+    por_producto = db_fetchall(
+        f"""SELECT p.nombre, p.categoria, p.unidad, SUM(m.cantidad) as total
+            FROM movimientos m JOIN productos p ON m.producto_id=p.id
+            {filtro_sql}
+            GROUP BY p.id, p.nombre, p.categoria, p.unidad
+            ORDER BY total DESC LIMIT 15""", params)
+
+    # Movimientos detalle
+    detalle = db_fetchall(
+        f"""SELECT m.fecha, m.tipo, p.nombre, p.unidad, m.cantidad, m.edificio, m.usuario
+            FROM movimientos m JOIN productos p ON m.producto_id=p.id
+            {filtro_sql}
+            ORDER BY m.created_at DESC LIMIT 100""", params)
+
+    return jsonify({
+        'total_salidas':  total_sal['s'] if total_sal else 0,
+        'total_entradas': total_ent['s'] if total_ent else 0,
+        'por_edificio':   por_edificio,
+        'por_producto':   por_producto,
+        'detalle':        detalle,
+    })
+
 if __name__=='__main__':
     init_db()
     app.run(debug=False,host='0.0.0.0',port=int(os.environ.get('PORT',5000)))
