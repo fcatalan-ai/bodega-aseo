@@ -781,6 +781,12 @@ def resumen_semanal():
 def reposicion_page():
     return render_template('reposicion.html', user=session['user'], rol=session['rol'])
 
+@app.route('/guia')
+@login_required
+def guia_page():
+    return render_template('guia.html', user=session['user'], rol=session['rol'],
+        edificios=EDIFICIOS)
+
 @app.route('/api/reposicion')
 @login_required
 def get_reposicion():
