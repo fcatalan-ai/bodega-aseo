@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guía de Entrada — Bodega Aseo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
+.topbar{background:#0D4F3C;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar h1{font-size:16px;font-weight:700}
+.topbar-links{display:flex;gap:14px;font-size:13px}
+.topbar-links a{color:#A8D5C5;text-decoration:none}
+.topbar-links a:hover{color:#fff}
+.topbar-links a.active{color:#FFD966;font-weight:600}
+.main{padding:16px;max-width:900px;margin:0 auto}
+.card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;padding:20px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:700;color:#1a6b52;text-transform:uppercase;letter-spacing:.05em;margin-bottom:16px;border-bottom:1px solid #f0f0f0;padding-bottom:8px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:560px){.form-row{grid-template-columns:1fr}}
+.form-group label{font-size:12px;color:#666;display:block;margin-bottom:4px}
+.form-group input,.form-group select{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:#27500A}
+/* Tabla de items */
+.items-header{display:grid;grid-template-columns:1fr 90px 38px;gap:8px;padding:0 0 6px;border-bottom:1px solid #eee;margin-bottom:8px}
+.items-header span{font-size:11px;font-weight:700;color:#999;text-transform:uppercase}
+.item-row{display:grid;grid-template-columns:1fr 90px 38px;gap:8px;margin-bottom:8px;align-items:center}
+.item-row select,.item-row input{padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%}
+.item-row select:focus,.item-row input:focus{outline:none;border-color:#27500A}
+.btn-rm{background:#fff;border:1px solid #fcc;color:#c00;border-radius:7px;width:34px;height:34px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.btn-rm:hover{background:#FCEBEB}
+.btn-add{background:#fff;color:#27500A;border:1px dashed #27500A;padding:7px 16px;border-radius:7px;font-size:13px;cursor:pointer;margin-top:4px}
+.btn-add:hover{background:#E2EFDA}
+.btn-entrada{background:#27500A;color:#fff;border:none;padding:9px 22px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+.btn-entrada:hover{background:#1a3d06}
+.btn-out{background:#fff;color:#555;border:1px solid #ddd;padding:9px 18px;border-radius:8px;font-size:13px;cursor:pointer}
+.btn-out:hover{background:#f5f5f5}
+.btn-row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+/* Guías emitidas */
+.guia-item{border:1px solid #c8e6d0;border-radius:8px;padding:14px;margin-bottom:10px;background:#fafffe}
+.guia-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px}
+.guia-id{font-size:12px;font-weight:700;color:#27500A;background:#E2EFDA;padding:2px 10px;border-radius:20px}
+.guia-meta{font-size:12px;color:#555;margin-bottom:8px}
+.guia-meta strong{color:#222}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{background:#E2EFDA;border:1px solid #a3d0a8;color:#27500A;border-radius:20px;padding:3px 10px;font-size:12px}
+.loading{text-align:center;padding:30px;color:#999;font-size:13px}
+.empty-guias{text-align:center;padding:30px;color:#aaa;font-size:13px}
+.btn-del-guia{background:#fff;border:1px solid #fcc;color:#c00;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
+.btn-del-guia:hover{background:#FCEBEB}
+.info-box{background:#E2EFDA;border:1px solid #a3d0a8;border-radius:7px;padding:10px 14px;font-size:13px;color:#27500A;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>🧴 Bodega de Aseo — Guía de Entrada</h1>
+  <div class="topbar-links">
+    <a href="/">📦 Inventario</a>
+    <a href="/dashboard">📊 Dashboard</a>
+    <a href="/movimientos">📋 Movimientos</a>
+    <a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>
+    <a href="/guia">📄 Guía Salida</a>
+    <a href="/guia_entrada" class="active">📥 Guía Entrada</a>
+    <a href="/logout">Salir</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- FORMULARIO NUEVA GUÍA DE ENTRADA -->
+  <div class="card">
+    <div class="card-title">📥 Nueva Guía de Entrada</div>
+
+    <div class="info-box">
+      📦 Usa este formulario para registrar el ingreso de productos al stock. Todos los productos ingresados sumarán a su stock actual.
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Responsable de la recepción *</label>
+        <input type="text" id="g-responsable" placeholder="Nombre completo">
+      </div>
+      <div class="form-group">
+        <label>Proveedor</label>
+        <input type="text" id="g-proveedor" placeholder="Nombre del proveedor">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Fecha *</label>
+        <input type="date" id="g-fecha">
+      </div>
+      <div class="form-group">
+        <label>Observaciones</label>
+        <input type="text" id="g-obs" placeholder="N° factura, orden de compra, etc.">
+      </div>
+    </div>
+
+    <!-- TABLA DE PRODUCTOS -->
+    <div style="margin-top:6px">
+      <div class="items-header">
+        <span>Producto</span>
+        <span>Cantidad</span>
+        <span></span>
+      </div>
+      <div id="items-container"></div>
+      <button class="btn-add" onclick="addFila()">+ Agregar fila</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-entrada" onclick="emitirGuia()">📥 Registrar Entrada</button>
+      <button class="btn-out" onclick="limpiarFormulario()">↺ Limpiar</button>
+    </div>
+  </div>
+
+  <!-- GUÍAS DE ENTRADA EMITIDAS -->
+  <div class="card">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📋 Entradas Registradas</span>
+      <span id="guias-count" style="font-size:12px;color:#888;text-transform:none;font-weight:400"></span>
+    </div>
+    <div id="guias-lista"><div class="loading">Cargando...</div></div>
+  </div>
+
+</div>
+
+<script>
+const PRODUCTOS_LISTA = ["Confort Chico","Confort Industrial 4x500","Nova Industrial 2x250","Bolsa Basura 50x70","Bolsa Basura 70x90","Bolsa Basura 80x110","Bolsa Basura 120x130","Cloro","Cloro Gel","Limpia Piso","Crema Cif","Lavalosa","Limpia Vidrio","Lustra-Mueble","Jabon Liquido Bidon","Desodorante Ambiental","Lysoform","Toalla Desinfectante","Alcohol Liquido","Alcohol Gel","Esponja","Paño Multiuso 3x1","Paño Chico Microfibra","Trapero Microfibra C/Ojal","Mopa Algodón (Chas)","Mopa Seca (Avion)","Disco Pulidores Rojo","Cera Sachet","Cera Liquida Roja","Cera Liquida Incolora","Liquido Piso Flotante","Escobillon","Escobillon Barra Agua","Virutilla Piso","Palas","Plumeros","Guantes - S/7","Guantes - M/8","Guantes L/9","Guantes G/10","Atomizador Plasticos"];
+
+let productosMap = {};
+
+async function cargarProductos(){
+  const r = await fetch('/api/productos');
+  const prods = await r.json();
+  productosMap = {};
+  prods.forEach(p=>{ productosMap[p.nombre] = {id: p.id, unidad: p.unidad, stock: p.stock_actual}; });
+}
+
+function crearSelectProducto(val=''){
+  const sel = document.createElement('select');
+  sel.innerHTML = '<option value="">— Seleccionar producto —</option>' +
+    PRODUCTOS_LISTA.map(p=>`<option value="${p}"${p===val?' selected':''}>${p}</option>`).join('');
+  return sel;
+}
+
+function addFila(producto='', cantidad=''){
+  const container = document.getElementById('items-container');
+  const row = document.createElement('div');
+  row.className = 'item-row';
+
+  const sel = crearSelectProducto(producto);
+  const inp = document.createElement('input');
+  inp.type='number'; inp.min='1'; inp.placeholder='Cant.'; inp.value=cantidad||'';
+
+  const btn = document.createElement('button');
+  btn.className='btn-rm'; btn.textContent='×';
+  btn.onclick=()=>{ if(container.children.length>1) row.remove(); else { sel.value=''; inp.value=''; } };
+
+  row.appendChild(sel); row.appendChild(inp); row.appendChild(btn);
+  container.appendChild(row);
+}
+
+function limpiarFormulario(){
+  document.getElementById('g-responsable').value='';
+  document.getElementById('g-proveedor').value='';
+  document.getElementById('g-obs').value='';
+  document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('items-container').innerHTML='';
+  for(let i=0;i<5;i++) addFila();
+}
+
+async function emitirGuia(){
+  const responsable = document.getElementById('g-responsable').value.trim();
+  const proveedor   = document.getElementById('g-proveedor').value.trim();
+  const fecha       = document.getElementById('g-fecha').value;
+  const obs         = document.getElementById('g-obs').value.trim();
+
+  if(!responsable){ alert('Ingresa el responsable de la recepción'); return; }
+
+  const rows = document.querySelectorAll('#items-container .item-row');
+  const items = [];
+  rows.forEach(row=>{
+    const nombre   = row.querySelector('select').value;
+    const cantidad = parseInt(row.querySelector('input').value)||0;
+    if(nombre && cantidad>0) items.push({nombre, cantidad});
+  });
+  if(!items.length){ alert('Agrega al menos un producto con cantidad válida'); return; }
+
+  // Cargar productos para obtener IDs
+  await cargarProductos();
+
+  // Verificar que todos los productos existan en inventario
+  const errores = [];
+  items.forEach(it=>{
+    if(!productosMap[it.nombre])
+      errores.push(`"${it.nombre}" no está registrado en inventario — agrégalo primero desde Inventario`);
+  });
+  if(errores.length){
+    alert('⚠️ Problemas encontrados:\n\n' + errores.join('\n'));
+    return;
+  }
+
+  const fechaFmt = fecha ? fecha.split('-').reverse().join('-') : new Date().toLocaleDateString('es-CL').replace(/\//g,'-');
+  const obsFinal = [proveedor ? `Proveedor: ${proveedor}` : '', obs].filter(Boolean).join(' · ');
+
+  let ok = true;
+  for(const it of items){
+    const prod = productosMap[it.nombre];
+    const data = {
+      producto_id: prod.id,
+      tipo: 'entrada',
+      cantidad: it.cantidad,
+      edificio: '',
+      observacion: obsFinal || '[Guía de entrada]',
+      fecha: fechaFmt,
+    };
+    const r = await fetch('/api/movimientos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    const d = await r.json();
+    if(d.error){ alert('Error al registrar "'+it.nombre+'": '+d.error); ok=false; break; }
+  }
+  if(!ok) return;
+
+  // Guardar en localStorage para historial visual
+  const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
+  const id = 'GE-'+Date.now();
+  guias.unshift({id, fecha:fechaFmt, responsable, proveedor, obs, items});
+  localStorage.setItem('bodega_guias_entrada', JSON.stringify(guias.slice(0,100)));
+
+  alert(`✅ Guía ${id} registrada correctamente.\n${items.length} producto(s) ingresados al stock.`);
+  limpiarFormulario();
+  renderGuias();
+}
+
+function renderGuias(){
+  const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
+  const container = document.getElementById('guias-lista');
+  document.getElementById('guias-count').textContent = guias.length ? `${guias.length} guía(s)` : '';
+  if(!guias.length){
+    container.innerHTML='<div class="empty-guias">No hay guías de entrada registradas aún</div>';
+    return;
+  }
+  container.innerHTML = guias.map((g,idx)=>`
+    <div class="guia-item">
+      <div class="guia-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="guia-id">${g.id}</span>
+          <span style="font-size:12px;color:#888">${g.fecha}</span>
+        </div>
+        <button class="btn-del-guia" onclick="eliminarGuia(${idx})">🗑️ Eliminar</button>
+      </div>
+      <div class="guia-meta">
+        <strong>${g.responsable}</strong>
+        ${g.proveedor ? ` · Proveedor: <strong>${g.proveedor}</strong>` : ''}
+        ${g.obs ? ` · <em style="color:#888">${g.obs}</em>` : ''}
+      </div>
+      <div class="chips">
+        ${g.items.map(it=>`<span class="chip">📥 ${it.nombre} ×${it.cantidad}</span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function eliminarGuia(idx){
+  if(!confirm('¿Eliminar este registro? (El stock ya fue sumado y no se revierte desde aquí)')) return;
+  const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
+  guias.splice(idx,1);
+  localStorage.setItem('bodega_guias_entrada', JSON.stringify(guias));
+  renderGuias();
+}
+
+// Inicializar
+document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
+limpiarFormulario();
+cargarProductos();
+renderGuias();
+</script>
+</body>
+</html>
