@@ -787,6 +787,11 @@ def guia_page():
     return render_template('guia.html', user=session['user'], rol=session['rol'],
         edificios=EDIFICIOS)
 
+@app.route('/guia_entrada')
+@login_required
+def guia_entrada_page():
+    return render_template('guia_entrada.html', user=session['user'], rol=session['rol'])
+
 @app.route('/api/reposicion')
 @login_required
 def get_reposicion():
