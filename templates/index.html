@@ -88,6 +88,7 @@ tr:hover td{background:#f0f7f4}
     <a href="/dashboard" class="dash">📊 Dashboard</a>
     <a href="/movimientos" style="color:#A8D5C5">📋 Movimientos</a>
     <a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>
+    <a href="/guia" style="color:#90caf9">📄 Guía Salida</a>
     <a href="/logout">Salir</a>
   </div>
 </div>
@@ -132,8 +133,11 @@ tr:hover td{background:#f0f7f4}
     <table>
       <thead>
         <tr>
-          <th>Producto</th><th>Categoría</th><th>Stock actual</th>
-          <th>Stock mínimo</th><th>Estado</th><th>Acciones</th>
+          <th onclick="sortBy('nombre')" style="cursor:pointer" title="Ordenar">Producto <span id="si-nombre">↕</span></th>
+          <th onclick="sortBy('categoria')" style="cursor:pointer" title="Ordenar">Categoría <span id="si-categoria">↕</span></th>
+          <th onclick="sortBy('stock_actual')" style="cursor:pointer" title="Ordenar">Stock actual <span id="si-stock_actual">↕</span></th>
+          <th onclick="sortBy('stock_minimo')" style="cursor:pointer" title="Ordenar">Stock mínimo <span id="si-stock_minimo">↕</span></th>
+          <th>Estado</th><th>Acciones</th>
         </tr>
       </thead>
       <tbody id="tabla-body"><tr><td colspan="6" class="loading">Cargando...</td></tr></tbody>
@@ -217,7 +221,12 @@ tr:hover td{background:#f0f7f4}
   <div class="modal">
     <h3 id="prod-title">Nuevo Producto</h3>
     <input type="hidden" id="prod-id">
-    <div class="form-group" style="margin-bottom:12px"><label>Nombre *</label><input id="prod-nombre" placeholder="Ej: Cloro 10L"></div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Producto *</label>
+      <select id="prod-nombre">
+        <option value="">— Seleccionar producto —</option>
+      </select>
+    </div>
     <div class="form-row">
       <div class="form-group"><label>Categoría</label>
         <select id="prod-cat">
@@ -244,7 +253,10 @@ tr:hover td{background:#f0f7f4}
 
 <script>
 
+const PRODUCTOS_LISTA = ["Confort Chico","Confort Industrial 4x500","Nova Industrial 2x250","Bolsa Basura 50x70","Bolsa Basura 70x90","Bolsa Basura 80x110","Bolsa Basura 120x130","Cloro","Cloro Gel","Limpia Piso","Crema Cif","Lavalosa","Limpia Vidrio","Lustra-Mueble","Jabon Liquido Bidon","Desodorante Ambiental","Lysoform","Toalla Desinfectante","Alcohol Liquido","Alcohol Gel","Esponja","Paño Multiuso 3x1","Paño Chico Microfibra","Trapero Microfibra C/Ojal","Mopa Algodón (Chas)","Mopa Seca (Avion)","Disco Pulidores Rojo","Cera Sachet","Cera Liquida Roja","Cera Liquida Incolora","Liquido Piso Flotante","Escobillon","Escobillon Barra Agua","Virutilla Piso","Palas","Plumeros","Guantes - S/7","Guantes - M/8","Guantes L/9","Guantes G/10","Atomizador Plasticos"];
+
 let productos = [], productoActual = null;
+let sortCol = 'nombre', sortDir = 1;
 
 async function cargarStats(){
   const r = await fetch('/api/stats');
@@ -284,12 +296,26 @@ function filtrar(){
   cargarProductos(new URLSearchParams({q,categoria:cat}).toString());
 }
 
+function sortBy(col){
+  if(sortCol===col) sortDir*=-1; else { sortCol=col; sortDir=1; }
+  document.querySelectorAll('[id^="si-"]').forEach(el=>el.textContent='↕');
+  const el=document.getElementById('si-'+col);
+  if(el) el.textContent=sortDir===1?'↑':'↓';
+  renderTabla();
+}
+
 function renderTabla(){
-  if(!productos.length){
+  let data = [...productos];
+  data.sort((a,b)=>{
+    let va=a[sortCol]||'', vb=b[sortCol]||'';
+    if(!isNaN(va)&&!isNaN(vb)) return (Number(va)-Number(vb))*sortDir;
+    return String(va).localeCompare(String(vb))*sortDir;
+  });
+  if(!data.length){
     document.getElementById('tabla-body').innerHTML='<tr><td colspan="6" class="loading">No se encontraron productos</td></tr>';
     return;
   }
-  document.getElementById('tabla-body').innerHTML = productos.map(p=>{
+  document.getElementById('tabla-body').innerHTML = data.map(p=>{
     const bajo = p.stock_minimo>0 && p.stock_actual<=p.stock_minimo;
     return `<tr>
       <td style="font-weight:600;color:#0D4F3C">${p.nombre}</td>
@@ -379,7 +405,20 @@ async function guardarMovimiento(){
   abrirPanel(productoActual.id);
 }
 
+function poblarSelectProducto(){
+  const sel = document.getElementById('prod-nombre');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Seleccionar producto —</option>';
+  PRODUCTOS_LISTA.forEach(p=>{
+    const o=document.createElement('option');
+    o.value=p; o.textContent=p;
+    sel.appendChild(o);
+  });
+  sel.value=cur;
+}
+
 function abrirModalProducto(){
+  poblarSelectProducto();
   document.getElementById('prod-title').textContent = 'Nuevo Producto';
   document.getElementById('prod-id').value = '';
   document.getElementById('prod-nombre').value = '';
@@ -390,6 +429,7 @@ function abrirModalProducto(){
 
 function abrirEditarProducto(){
   if(!productoActual) return;
+  poblarSelectProducto();
   const p = productoActual;
   document.getElementById('prod-title').textContent = 'Editar: '+p.nombre;
   document.getElementById('prod-id').value = p.id;
@@ -403,14 +443,15 @@ function abrirEditarProducto(){
 
 async function guardarProducto(){
   const id = document.getElementById('prod-id').value;
+  const nombre = document.getElementById('prod-nombre').value;
+  if(!nombre){ alert('Selecciona un producto'); return; }
   const data = {
-    nombre: document.getElementById('prod-nombre').value,
+    nombre,
     categoria: document.getElementById('prod-cat').value,
     unidad: document.getElementById('prod-unidad').value,
     stock_actual: parseInt(document.getElementById('prod-stock').value)||0,
     stock_minimo: parseInt(document.getElementById('prod-minimo').value)||0,
   };
-  if(!data.nombre){ alert('El nombre es obligatorio'); return; }
   const url = id ? '/api/productos/'+id : '/api/productos';
   const method = id ? 'PUT' : 'POST';
   const r = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
