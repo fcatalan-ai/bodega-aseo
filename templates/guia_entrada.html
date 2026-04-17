@@ -21,9 +21,9 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 .form-group input,.form-group select{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px}
 .form-group input:focus,.form-group select:focus{outline:none;border-color:#27500A}
 /* Tabla de items */
-.items-header{display:grid;grid-template-columns:1fr 90px 38px;gap:8px;padding:0 0 6px;border-bottom:1px solid #eee;margin-bottom:8px}
+.items-header{display:grid;grid-template-columns:1fr 90px 110px 90px 38px;gap:8px;padding:0 0 6px;border-bottom:1px solid #eee;margin-bottom:8px}
 .items-header span{font-size:11px;font-weight:700;color:#999;text-transform:uppercase}
-.item-row{display:grid;grid-template-columns:1fr 90px 38px;gap:8px;margin-bottom:8px;align-items:center}
+.item-row{display:grid;grid-template-columns:1fr 90px 110px 90px 38px;gap:8px;margin-bottom:8px;align-items:center}
 .item-row select,.item-row input{padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%}
 .item-row select:focus,.item-row input:focus{outline:none;border-color:#27500A}
 .btn-rm{background:#fff;border:1px solid #fcc;color:#c00;border-radius:7px;width:34px;height:34px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -101,10 +101,16 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
       <div class="items-header">
         <span>Producto</span>
         <span>Cantidad</span>
+        <span>Precio unit. ($)</span>
+        <span>Total</span>
         <span></span>
       </div>
       <div id="items-container"></div>
       <button class="btn-add" onclick="addFila()">+ Agregar fila</button>
+      <div style="display:flex;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid #eee;gap:12px;align-items:center">
+        <span style="font-size:13px;color:#666;font-weight:600">Total guía:</span>
+        <span id="total-general" style="font-size:16px;font-weight:700;color:#27500A">—</span>
+      </div>
     </div>
 
     <div class="btn-row">
@@ -143,21 +149,58 @@ function crearSelectProducto(val=''){
   return sel;
 }
 
-function addFila(producto='', cantidad=''){
+function addFila(producto='', cantidad='', precio=''){
   const container = document.getElementById('items-container');
   const row = document.createElement('div');
   row.className = 'item-row';
 
   const sel = crearSelectProducto(producto);
-  const inp = document.createElement('input');
-  inp.type='number'; inp.min='1'; inp.placeholder='Cant.'; inp.value=cantidad||'';
+
+  const inpCant = document.createElement('input');
+  inpCant.type='number'; inpCant.min='1'; inpCant.placeholder='Cant.'; inpCant.value=cantidad||'';
+
+  const inpPrecio = document.createElement('input');
+  inpPrecio.type='number'; inpPrecio.min='0'; inpPrecio.placeholder='$ 0'; inpPrecio.value=precio||'';
+  inpPrecio.style.textAlign='right';
+
+  const spanTotal = document.createElement('span');
+  spanTotal.style.cssText='font-size:13px;font-weight:600;color:#27500A;text-align:right;padding:0 4px';
+  spanTotal.textContent='—';
+
+  function actualizarTotal(){
+    const c = parseInt(inpCant.value)||0;
+    const p = parseInt(inpPrecio.value)||0;
+    spanTotal.textContent = (c && p) ? '$'+((c*p).toLocaleString('es-CL')) : '—';
+    actualizarTotalGeneral();
+  }
+  inpCant.oninput = actualizarTotal;
+  inpPrecio.oninput = actualizarTotal;
 
   const btn = document.createElement('button');
   btn.className='btn-rm'; btn.textContent='×';
-  btn.onclick=()=>{ if(container.children.length>1) row.remove(); else { sel.value=''; inp.value=''; } };
+  btn.onclick=()=>{
+    if(container.children.length>1){ row.remove(); actualizarTotalGeneral(); }
+    else { sel.value=''; inpCant.value=''; inpPrecio.value=''; actualizarTotal(); }
+  };
 
-  row.appendChild(sel); row.appendChild(inp); row.appendChild(btn);
+  row.appendChild(sel); row.appendChild(inpCant); row.appendChild(inpPrecio);
+  row.appendChild(spanTotal); row.appendChild(btn);
   container.appendChild(row);
+
+  // Restaurar total si hay valores iniciales
+  if(cantidad && precio) actualizarTotal();
+}
+
+function actualizarTotalGeneral(){
+  let total = 0;
+  document.querySelectorAll('#items-container .item-row').forEach(row=>{
+    const inputs = row.querySelectorAll('input');
+    const c = parseInt(inputs[0].value)||0;
+    const p = parseInt(inputs[1].value)||0;
+    total += c*p;
+  });
+  const el = document.getElementById('total-general');
+  if(el) el.textContent = total>0 ? '$'+total.toLocaleString('es-CL') : '—';
 }
 
 function limpiarFormulario(){
@@ -181,8 +224,10 @@ async function emitirGuia(){
   const items = [];
   rows.forEach(row=>{
     const nombre   = row.querySelector('select').value;
-    const cantidad = parseInt(row.querySelector('input').value)||0;
-    if(nombre && cantidad>0) items.push({nombre, cantidad});
+    const inputs   = row.querySelectorAll('input');
+    const cantidad = parseInt(inputs[0].value)||0;
+    const precio   = parseInt(inputs[1].value)||0;
+    if(nombre && cantidad>0) items.push({nombre, cantidad, precio});
   });
   if(!items.length){ alert('Agrega al menos un producto con cantidad válida'); return; }
 
@@ -206,12 +251,13 @@ async function emitirGuia(){
   let ok = true;
   for(const it of items){
     const prod = productosMap[it.nombre];
+    const precioInfo = it.precio>0 ? ` | P.Unit: $${it.precio.toLocaleString('es-CL')}` : '';
     const data = {
       producto_id: prod.id,
       tipo: 'entrada',
       cantidad: it.cantidad,
       edificio: '',
-      observacion: obsFinal || '[Guía de entrada]',
+      observacion: (obsFinal || '[Guía de entrada]') + precioInfo,
       fecha: fechaFmt,
     };
     const r = await fetch('/api/movimientos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
@@ -220,10 +266,12 @@ async function emitirGuia(){
   }
   if(!ok) return;
 
+  const totalGuia = items.reduce((s,it)=>s+(it.cantidad*(it.precio||0)),0);
+
   // Guardar en localStorage para historial visual
   const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
   const id = 'GE-'+Date.now();
-  guias.unshift({id, fecha:fechaFmt, responsable, proveedor, obs, items});
+  guias.unshift({id, fecha:fechaFmt, responsable, proveedor, obs, items, total:totalGuia});
   localStorage.setItem('bodega_guias_entrada', JSON.stringify(guias.slice(0,100)));
 
   alert(`✅ Guía ${id} registrada correctamente.\n${items.length} producto(s) ingresados al stock.`);
@@ -254,8 +302,9 @@ function renderGuias(){
         ${g.obs ? ` · <em style="color:#888">${g.obs}</em>` : ''}
       </div>
       <div class="chips">
-        ${g.items.map(it=>`<span class="chip">📥 ${it.nombre} ×${it.cantidad}</span>`).join('')}
+        ${g.items.map(it=>`<span class="chip">📥 ${it.nombre} ×${it.cantidad}${it.precio>0?' · $'+it.precio.toLocaleString('es-CL')+'c/u':''}</span>`).join('')}
       </div>
+      ${g.total>0?`<div style="margin-top:8px;text-align:right;font-size:13px;font-weight:700;color:#27500A">Total: $${g.total.toLocaleString('es-CL')}</div>`:''}
     </div>
   `).join('');
 }
