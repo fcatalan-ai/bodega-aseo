@@ -223,10 +223,12 @@ tr:hover td{background:#f0f7f4}
     <h3 id="prod-title">Nuevo Producto</h3>
     <input type="hidden" id="prod-id">
     <div class="form-group" style="margin-bottom:12px">
-      <label>Producto *</label>
-      <select id="prod-nombre">
-        <option value="">— Seleccionar producto —</option>
-      </select>
+      <label>Nombre del producto *</label>
+      <input type="text" id="prod-nombre" list="prod-nombre-list"
+        placeholder="Escribe o selecciona un producto existente..."
+        autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px">
+      <datalist id="prod-nombre-list"></datalist>
+      <div style="font-size:11px;color:#888;margin-top:4px">💡 Si el producto no existe, escribe el nombre nuevo y se creará</div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Categoría</label>
@@ -407,15 +409,9 @@ async function guardarMovimiento(){
 }
 
 function poblarSelectProducto(){
-  const sel = document.getElementById('prod-nombre');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">— Seleccionar producto —</option>';
-  PRODUCTOS_LISTA.forEach(p=>{
-    const o=document.createElement('option');
-    o.value=p; o.textContent=p;
-    sel.appendChild(o);
-  });
-  sel.value=cur;
+  // Poblar datalist con productos existentes en la BD
+  const dl = document.getElementById('prod-nombre-list');
+  if(dl) dl.innerHTML = productos.map(p=>`<option value="${p.nombre}">`).join('');
 }
 
 function abrirModalProducto(){
@@ -423,9 +419,12 @@ function abrirModalProducto(){
   document.getElementById('prod-title').textContent = 'Nuevo Producto';
   document.getElementById('prod-id').value = '';
   document.getElementById('prod-nombre').value = '';
+  document.getElementById('prod-cat').value = 'Varios';
+  document.getElementById('prod-unidad').value = 'unidades';
   document.getElementById('prod-stock').value = 0;
   document.getElementById('prod-minimo').value = 0;
   document.getElementById('modal-producto').classList.add('show');
+  setTimeout(()=>document.getElementById('prod-nombre').focus(), 100);
 }
 
 function abrirEditarProducto(){
@@ -445,7 +444,7 @@ function abrirEditarProducto(){
 async function guardarProducto(){
   const id = document.getElementById('prod-id').value;
   const nombre = document.getElementById('prod-nombre').value;
-  if(!nombre){ alert('Selecciona un producto'); return; }
+  if(!nombre.trim()){ alert('Ingresa el nombre del producto'); return; }
   const data = {
     nombre,
     categoria: document.getElementById('prod-cat').value,
