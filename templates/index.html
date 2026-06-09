@@ -63,6 +63,11 @@ tr:hover td{background:#f0f7f4}
 .modal-bg.show{display:flex}
 .modal{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;margin:16px}
 .modal h3{font-size:16px;font-weight:700;margin-bottom:16px;color:#0D4F3C}
+.prod-drop-item{padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center}
+.prod-drop-item:hover{background:#f0f7f4}
+.prod-drop-item.nuevo{color:#0D4F3C;font-weight:600;background:#E2EFDA}
+.prod-drop-item.nuevo:hover{background:#c8e6d0}
+.prod-drop-stock{font-size:11px;color:#888;background:#f5f5f5;padding:1px 6px;border-radius:10px}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 .form-group label{font-size:12px;color:#666;display:block;margin-bottom:4px}
 .form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px}
@@ -222,13 +227,16 @@ tr:hover td{background:#f0f7f4}
   <div class="modal">
     <h3 id="prod-title">Nuevo Producto</h3>
     <input type="hidden" id="prod-id">
-    <div class="form-group" style="margin-bottom:12px">
+    <div class="form-group" style="margin-bottom:12px;position:relative">
       <label>Nombre del producto *</label>
-      <input type="text" id="prod-nombre" list="prod-nombre-list"
-        placeholder="Escribe o selecciona un producto existente..."
-        autocomplete="off" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px">
-      <datalist id="prod-nombre-list"></datalist>
-      <div style="font-size:11px;color:#888;margin-top:4px">💡 Si el producto no existe, escribe el nombre nuevo y se creará</div>
+      <input type="text" id="prod-nombre"
+        placeholder="Busca un producto existente o escribe uno nuevo..."
+        autocomplete="off"
+        oninput="filtrarProductosModal(this.value)"
+        onfocus="filtrarProductosModal(this.value)"
+        style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px">
+      <div id="prod-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 7px 7px;max-height:200px;overflow-y:auto;z-index:500;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+      <div id="prod-nombre-hint" style="font-size:11px;margin-top:4px;color:#888"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Categoría</label>
@@ -407,6 +415,103 @@ async function guardarMovimiento(){
   cargarStats(); filtrar();
   abrirPanel(productoActual.id);
 }
+
+function filtrarProductosModal(q){
+  const dropdown = document.getElementById('prod-dropdown');
+  const hint = document.getElementById('prod-nombre-hint');
+  q = (q||'').trim();
+
+  if(!q){
+    dropdown.style.display = 'none';
+    hint.textContent = '';
+    return;
+  }
+
+  const ql = q.toLowerCase();
+  const coincidencias = productos.filter(p => p.nombre.toLowerCase().includes(ql));
+  const exacto = productos.find(p => p.nombre.toLowerCase() === ql);
+
+  let html = '';
+
+  // Mostrar coincidencias
+  coincidencias.slice(0,8).forEach(p=>{
+    html += `<div class="prod-drop-item" onclick="seleccionarProductoModal('${p.nombre.replace(/'/g,"\'")}', ${p.id})">
+      <span>${p.nombre}</span>
+      <span class="prod-drop-stock">${p.stock_actual} ${p.unidad}</span>
+    </div>`;
+  });
+
+  // Si no hay exacto, ofrecer crear nuevo
+  if(!exacto && q.length >= 2){
+    html += `<div class="prod-drop-item nuevo" onclick="seleccionarNuevoModal('${q.replace(/'/g,"\'")}')">
+      ✚ Crear nuevo: "<strong>${q}</strong>"
+    </div>`;
+  }
+
+  if(html){
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+  } else {
+    dropdown.style.display = 'none';
+  }
+
+  // Hint
+  if(exacto){
+    hint.innerHTML = '✅ Producto existente — se editará su información';
+    hint.style.color = '#27500A';
+    // Autocompletar campos si existe
+    const id_input = document.getElementById('prod-id');
+    if(!id_input.value) {
+      document.getElementById('prod-cat').value = exacto.categoria || 'Varios';
+      document.getElementById('prod-unidad').value = exacto.unidad || 'unidades';
+      document.getElementById('prod-stock').value = exacto.stock_actual || 0;
+      document.getElementById('prod-minimo').value = exacto.stock_minimo || 0;
+    }
+  } else if(q.length >= 2){
+    hint.innerHTML = '💡 Producto nuevo — se creará al guardar';
+    hint.style.color = '#888';
+  } else {
+    hint.textContent = '';
+  }
+}
+
+function seleccionarProductoModal(nombre, id){
+  document.getElementById('prod-nombre').value = nombre;
+  document.getElementById('prod-dropdown').style.display = 'none';
+  // Buscar producto y llenar campos
+  const p = productos.find(x=>x.id===id);
+  if(p){
+    document.getElementById('prod-id').value = p.id;
+    document.getElementById('prod-cat').value = p.categoria||'Varios';
+    document.getElementById('prod-unidad').value = p.unidad||'unidades';
+    document.getElementById('prod-stock').value = p.stock_actual||0;
+    document.getElementById('prod-minimo').value = p.stock_minimo||0;
+    const hint = document.getElementById('prod-nombre-hint');
+    hint.innerHTML = '✅ Producto existente seleccionado';
+    hint.style.color = '#27500A';
+  }
+}
+
+function seleccionarNuevoModal(nombre){
+  document.getElementById('prod-nombre').value = nombre;
+  document.getElementById('prod-dropdown').style.display = 'none';
+  document.getElementById('prod-id').value = '';
+  document.getElementById('prod-cat').value = 'Varios';
+  document.getElementById('prod-unidad').value = 'unidades';
+  document.getElementById('prod-stock').value = 0;
+  document.getElementById('prod-minimo').value = 0;
+  const hint = document.getElementById('prod-nombre-hint');
+  hint.innerHTML = '💡 Producto nuevo — se creará al guardar';
+  hint.style.color = '#888';
+}
+
+// Cerrar dropdown al hacer clic fuera
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#modal-producto')) {
+    const dd = document.getElementById('prod-dropdown');
+    if(dd) dd.style.display='none';
+  }
+});
 
 function poblarSelectProducto(){
   // Poblar datalist con productos existentes en la BD
