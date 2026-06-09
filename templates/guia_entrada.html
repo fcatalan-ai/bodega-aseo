@@ -131,7 +131,15 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 </div>
 
 <script>
-const PRODUCTOS_LISTA = ["Confort Chico","Confort Industrial 4x500","Nova Industrial 2x250","Bolsa Basura 50x70","Bolsa Basura 70x90","Bolsa Basura 80x110","Bolsa Basura 120x130","Cloro","Cloro Gel","Limpia Piso","Crema Cif","Lavalosa","Limpia Vidrio","Lustra-Mueble","Jabon Liquido Bidon","Desodorante Ambiental","Lysoform","Toalla Desinfectante","Alcohol Liquido","Alcohol Gel","Esponja","Paño Multiuso 3x1","Paño Chico Microfibra","Trapero Microfibra C/Ojal","Mopa Algodón (Chas)","Mopa Seca (Avion)","Disco Pulidores Rojo","Cera Sachet","Cera Liquida Roja","Cera Liquida Incolora","Liquido Piso Flotante","Escobillon","Escobillon Barra Agua","Virutilla Piso","Palas","Plumeros","Guantes - S/7","Guantes - M/8","Guantes L/9","Guantes G/10","Atomizador Plasticos"];
+// Productos se cargan dinámicamente desde la BD
+let PRODUCTOS_BD = [];
+
+async function cargarProductosBD(){
+  const r = await fetch('/api/productos');
+  const prods = await r.json();
+  PRODUCTOS_BD = prods.filter(p=>p.activo!==false);
+  return PRODUCTOS_BD;
+}
 
 let productosMap = {};
 
@@ -145,7 +153,7 @@ async function cargarProductos(){
 function crearSelectProducto(val=''){
   const sel = document.createElement('select');
   sel.innerHTML = '<option value="">— Seleccionar producto —</option>' +
-    PRODUCTOS_LISTA.map(p=>`<option value="${p}"${p===val?' selected':''}>${p}</option>`).join('');
+    PRODUCTOS_BD.map(p=>`<option value="${p.nombre}"${p.nombre===val?' selected':''}>${p.nombre} (${p.stock_actual} ${p.unidad})</option>`).join('');
   return sel;
 }
 
@@ -319,9 +327,11 @@ function eliminarGuia(idx){
 
 // Inicializar
 document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
-limpiarFormulario();
-cargarProductos();
-renderGuias();
+cargarProductosBD().then(()=>{
+  limpiarFormulario();
+  cargarProductos();
+  renderGuias();
+});
 </script>
 </body>
 </html>
