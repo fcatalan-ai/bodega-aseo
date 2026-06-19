@@ -210,6 +210,7 @@ function addFila(producto='', cantidad='', precio=''){
 
   inp.onblur = ()=>{ dd.style.display='none'; };
   inp.onfocus = ()=>{ if(inp.value) inp.oninput(); };
+  dd.addEventListener('mousedown', e=>e.preventDefault()); // evitar blur al hacer clic en dropdown
 
   wrap.appendChild(inp);
   wrap.appendChild(dd);
