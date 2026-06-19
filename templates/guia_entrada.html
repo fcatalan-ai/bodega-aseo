@@ -195,22 +195,28 @@ function addFila(producto='', cantidad='', precio=''){
     if(!q){ dd.style.display='none'; return; }
     const matches = PRODUCTOS_BD.filter(p=>p.nombre.toLowerCase().includes(q));
     if(!matches.length){ dd.style.display='none'; return; }
-    dd.innerHTML = matches.slice(0,8).map(p=>
-      `<div style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"
-        onmousedown="seleccionarProdFila(this,event)"
-        data-nombre="${p.nombre}"
-        onmouseover="this.style.background='#f0f7f4'"
-        onmouseout="this.style.background=''">
-        <span>${p.nombre}</span>
-        <span style="font-size:11px;color:#888">${p.stock_actual} ${p.unidad}</span>
-      </div>`
-    ).join('');
+    dd.innerHTML = '';
+    matches.slice(0,8).forEach(p=>{
+      const item = document.createElement('div');
+      item.style.cssText = 'padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between';
+      item.innerHTML = `<span>${p.nombre}</span><span style="font-size:11px;color:#888">${p.stock_actual} ${p.unidad}</span>`;
+      item.addEventListener('mouseover', ()=>item.style.background='#f0f7f4');
+      item.addEventListener('mouseout',  ()=>item.style.background='');
+      item.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
+        inp.value = p.nombre;
+        dd.style.display = 'none';
+        dd.innerHTML = '';
+        inpCant.focus();
+      });
+      dd.appendChild(item);
+    });
     dd.style.display='block';
   };
 
-  inp.onblur = ()=>{ dd.style.display='none'; };
+  inp.addEventListener('blur', ()=>{ setTimeout(()=>{ dd.style.display='none'; }, 150); });
   inp.onfocus = ()=>{ if(inp.value) inp.oninput(); };
-  dd.addEventListener('mousedown', e=>e.preventDefault()); // evitar blur al hacer clic en dropdown
+
 
   wrap.appendChild(inp);
   wrap.appendChild(dd);
