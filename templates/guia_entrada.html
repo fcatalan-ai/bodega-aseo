@@ -208,7 +208,7 @@ function addFila(producto='', cantidad='', precio=''){
     dd.style.display='block';
   };
 
-  inp.onblur = ()=>{ setTimeout(()=>dd.style.display='none', 200); };
+  inp.onblur = ()=>{ dd.style.display='none'; };
   inp.onfocus = ()=>{ if(inp.value) inp.oninput(); };
 
   wrap.appendChild(inp);
@@ -268,11 +268,13 @@ function addFila(producto='', cantidad='', precio=''){
 
 function seleccionarProdFila(el, e){
   e.preventDefault();
+  e.stopPropagation();
   const row = el.closest('.item-row');
   const inp = row.querySelector('input[type=text]');
   const dd  = row.querySelector('div[style*="position:absolute"]');
   inp.value = el.dataset.nombre;
-  if(dd) dd.style.display='none';
+  dd.style.display='none';
+  inp.blur();
 }
 
 function actualizarTotalGeneral(){
