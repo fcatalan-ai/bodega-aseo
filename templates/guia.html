@@ -174,7 +174,7 @@ function crearSelectProducto(val=''){
     dd.style.display='block';
   };
   inp.onfocus = ()=>{ if(inp.value) inp.oninput(); };
-  inp.onblur  = ()=>{ setTimeout(()=>dd.style.display='none', 200); };
+  inp.onblur  = ()=>{ dd.style.display='none'; };
 
   wrap.appendChild(inp); wrap.appendChild(dd);
   return wrap;
@@ -182,11 +182,13 @@ function crearSelectProducto(val=''){
 
 function seleccionarProd(el, e){
   e.preventDefault();
+  e.stopPropagation();
   const wrap = el.closest('div[style*="position:relative"]');
   const inp = wrap.querySelector('input');
   const dd  = wrap.querySelector('div[style*="position:absolute"]');
   inp.value = el.dataset.nombre;
-  if(dd) dd.style.display='none';
+  dd.style.display='none';
+  inp.blur();
 }
 
 function addFila(producto='', cantidad=''){
