@@ -175,6 +175,7 @@ function crearSelectProducto(val=''){
   };
   inp.onfocus = ()=>{ if(inp.value) inp.oninput(); };
   inp.onblur  = ()=>{ dd.style.display='none'; };
+  dd.addEventListener('mousedown', e=>e.preventDefault()); // evitar blur al hacer clic en dropdown
 
   wrap.appendChild(inp); wrap.appendChild(dd);
   return wrap;
