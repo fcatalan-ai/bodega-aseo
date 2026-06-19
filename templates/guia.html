@@ -128,30 +128,65 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 </div>
 
 <script>
-// Productos se cargan dinámicamente desde la BD
-let PRODUCTOS_BD = [];
-
-async function cargarProductosBD(){
-  const r = await fetch('/api/productos');
-  const prods = await r.json();
-  PRODUCTOS_BD = prods.filter(p=>p.activo!==false);
-  return PRODUCTOS_BD;
-}
+const PRODUCTOS_LISTA = ["Confort Chico","Confort Industrial 4x500","Nova Industrial 2x250","Bolsa Basura 50x70","Bolsa Basura 70x90","Bolsa Basura 80x110","Bolsa Basura 120x130","Cloro","Cloro Gel","Limpia Piso","Crema Cif","Lavalosa","Limpia Vidrio","Lustra-Mueble","Jabon Liquido Bidon","Desodorante Ambiental","Lysoform","Toalla Desinfectante","Alcohol Liquido","Alcohol Gel","Esponja","Paño Multiuso 3x1","Paño Chico Microfibra","Trapero Microfibra C/Ojal","Mopa Algodón (Chas)","Mopa Seca (Avion)","Disco Pulidores Rojo","Cera Sachet","Cera Liquida Roja","Cera Liquida Incolora","Liquido Piso Flotante","Escobillon","Escobillon Barra Agua","Virutilla Piso","Palas","Plumeros","Guantes - S/7","Guantes - M/8","Guantes L/9","Guantes G/10","Atomizador Plasticos"];
 
 let stockMap = {}; // nombre -> stock_actual
+
+let PRODUCTOS_BD = [];
 
 async function cargarStock(){
   const r = await fetch('/api/productos');
   const prods = await r.json();
+  PRODUCTOS_BD = prods;
   stockMap = {};
   prods.forEach(p=>{ stockMap[p.nombre] = {stock: p.stock_actual, unidad: p.unidad, id: p.id}; });
 }
 
 function crearSelectProducto(val=''){
-  const sel = document.createElement('select');
-  sel.innerHTML = '<option value="">— Seleccionar producto —</option>' +
-    PRODUCTOS_BD.map(p=>`<option value="${p.nombre}"${p.nombre===val?' selected':''}>${p.nombre} (${p.stock_actual} ${p.unidad})</option>`).join('');
-  return sel;
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:relative;width:100%';
+
+  const inp = document.createElement('input');
+  inp.type='text'; inp.placeholder='Buscar producto...';
+  inp.value = val||'';
+  inp.autocomplete = 'off';
+  inp.style.cssText = 'width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px';
+
+  const dd = document.createElement('div');
+  dd.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 7px 7px;max-height:180px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.1)';
+
+  inp.oninput = ()=>{
+    const q = inp.value.toLowerCase().trim();
+    if(!q){ dd.style.display='none'; return; }
+    const matches = PRODUCTOS_BD.filter(p=>p.nombre.toLowerCase().includes(q));
+    if(!matches.length){ dd.style.display='none'; return; }
+    dd.innerHTML = matches.slice(0,8).map(p=>{
+      const bajo = p.stock_actual <= (p.stock_minimo||0);
+      return `<div style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center"
+        onmousedown="seleccionarProd(this,event)"
+        data-nombre="${p.nombre}"
+        onmouseover="this.style.background='#f0f7f4'"
+        onmouseout="this.style.background=''">
+        <span>${p.nombre}</span>
+        <span style="font-size:11px;color:${bajo?'#c00':'#888'};font-weight:${bajo?'700':'400'}">${p.stock_actual} ${p.unidad}${bajo?' ⚠️':''}</span>
+      </div>`;
+    }).join('');
+    dd.style.display='block';
+  };
+  inp.onfocus = ()=>{ if(inp.value) inp.oninput(); };
+  inp.onblur  = ()=>{ setTimeout(()=>dd.style.display='none', 200); };
+
+  wrap.appendChild(inp); wrap.appendChild(dd);
+  return wrap;
+}
+
+function seleccionarProd(el, e){
+  e.preventDefault();
+  const wrap = el.closest('div[style*="position:relative"]');
+  const inp = wrap.querySelector('input');
+  const dd  = wrap.querySelector('div[style*="position:absolute"]');
+  inp.value = el.dataset.nombre;
+  if(dd) dd.style.display='none';
 }
 
 function addFila(producto='', cantidad=''){
@@ -162,6 +197,7 @@ function addFila(producto='', cantidad=''){
   const sel = crearSelectProducto(producto);
   const inp = document.createElement('input');
   inp.type='number'; inp.min='1'; inp.placeholder='Cant.'; inp.value=cantidad||'';
+  inp.style.cssText='padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%';
 
   const btn = document.createElement('button');
   btn.className='btn-rm'; btn.textContent='×';
@@ -193,8 +229,8 @@ async function emitirGuia(){
   const rows = document.querySelectorAll('#items-container .item-row');
   const items = [];
   rows.forEach(row=>{
-    const nombre   = row.querySelector('select').value;
-    const cantidad = parseInt(row.querySelector('input').value)||0;
+    const nombre   = (row.querySelector('input[type=text]')?.value||'').trim();
+    const cantidad = parseInt(row.querySelector('input[type=number]')?.value)||0;
     if(nombre && cantidad>0) items.push({nombre, cantidad});
   });
   if(!items.length){ alert('Agrega al menos un producto con cantidad válida'); return; }
@@ -285,9 +321,8 @@ function eliminarGuia(idx){
 
 // Inicializar
 document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
-cargarProductosBD().then(()=>{
+cargarStock().then(()=>{
   limpiarFormulario();
-  cargarStock();
   renderGuias();
 });
 </script>
