@@ -111,7 +111,61 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def operador_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user' not in session: return redirect('/login')
+        if session.get('rol') not in ('admin','operador'): return jsonify({'error':'Sin permisos'}), 403
+        return f(*args, **kwargs)
+    return decorated
+
 # ── AUTH ─────────────────────────────────────────────────────────────────────
+@app.route('/admin/usuarios')
+@admin_required
+def admin_usuarios():
+    usuarios = db_fetchall("SELECT id, nombre, email, rol, edificio FROM usuarios ORDER BY rol, nombre")
+    return render_template('admin_usuarios.html', usuarios=usuarios,
+                          edificios=EDIFICIOS, user=session['user'], rol=session['rol'])
+
+@app.route('/admin/usuarios/crear', methods=['POST'])
+@admin_required
+def crear_usuario():
+    data = request.json
+    nombre   = data.get('nombre','').strip()
+    email    = data.get('email','').strip()
+    password = data.get('password','').strip()
+    rol      = data.get('rol','operador')
+    edificio = data.get('edificio','')
+    if not nombre or not email or not password:
+        return jsonify({'error':'Todos los campos son requeridos'}), 400
+    try:
+        db_execute("INSERT INTO usuarios (nombre,email,password,rol,edificio) VALUES (?,?,?,?,?)",
+                  (nombre, email, password, rol, edificio))
+        return jsonify({'ok': True})
+    except Exception as e:
+        if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
+            return jsonify({'error': 'El email ya está registrado'}), 400
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/usuarios/<int:uid>', methods=['DELETE'])
+@admin_required
+def eliminar_usuario(uid):
+    u = db_fetchone("SELECT rol FROM usuarios WHERE id=?", (uid,))
+    if u and u['rol'] == 'admin':
+        return jsonify({'error': 'No se puede eliminar al administrador'}), 400
+    db_execute("DELETE FROM usuarios WHERE id=?", (uid,))
+    return jsonify({'ok': True})
+
+@app.route('/admin/usuarios/<int:uid>/password', methods=['PUT'])
+@admin_required
+def cambiar_password(uid):
+    data = request.json
+    password = data.get('password','').strip()
+    if not password:
+        return jsonify({'error':'Password requerido'}), 400
+    db_execute("UPDATE usuarios SET password=? WHERE id=?", (password, uid))
+    return jsonify({'ok': True})
+
 @app.route('/login', methods=['GET','POST'])
 def login():
     error = ''
@@ -325,7 +379,7 @@ def kpis():
     })
 
 @app.route('/dashboard')
-@login_required
+@admin_required
 def dashboard():
     return render_template('dashboard.html', user=session['user'], rol=session['rol'])
 
@@ -777,7 +831,7 @@ def resumen_semanal():
     })
 
 @app.route('/reposicion')
-@login_required
+@admin_required
 def reposicion_page():
     return render_template('reposicion.html', user=session['user'], rol=session['rol'])
 
@@ -788,7 +842,7 @@ def guia_page():
         edificios=EDIFICIOS)
 
 @app.route('/guia_entrada')
-@login_required
+@admin_required
 def guia_entrada_page():
     return render_template('guia_entrada.html', user=session['user'], rol=session['rol'])
 
