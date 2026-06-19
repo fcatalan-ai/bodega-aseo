@@ -147,9 +147,19 @@ const PRODUCTOS_LISTA = ["Confort Chico","Confort Industrial 4x500","Nova Indust
 
 let productosMap = {};
 
+// Lista global de productos para el buscador
+let PRODUCTOS_BD = [];
+
+async function cargarProductosBD(){
+  const r = await fetch('/api/productos');
+  PRODUCTOS_BD = await r.json();
+  return PRODUCTOS_BD;
+}
+
 async function cargarProductos(){
   const r = await fetch('/api/productos');
   const prods = await r.json();
+  PRODUCTOS_BD = prods; // también actualiza PRODUCTOS_BD
   productosMap = {};
   prods.forEach(p=>{ productosMap[p.nombre] = {id: p.id, unidad: p.unidad, stock: p.stock_actual}; });
 }
@@ -291,6 +301,7 @@ function limpiarFormulario(){
   document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('items-container').innerHTML='';
   for(let i=0;i<5;i++) addFila();
+  actualizarTotalGeneral();
 }
 
 async function emitirGuia(){
@@ -406,8 +417,10 @@ function eliminarGuia(idx){
 // Inicializar
 document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
 limpiarFormulario();
-cargarProductos();
-renderGuias();
+cargarProductos().then(()=>{
+  limpiarFormulario();
+  renderGuias();
+});
 </script>
 </body>
 </html>
