@@ -8,7 +8,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'bodega-aseo-2025-secret')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 CATEGORIAS = ['Papel','Bolsas','Líquidos Limpieza','Desinfectantes','Paños','Guantes','Varios']
-EDIFICIOS  = ['Básica','Media','Parvularia']
+EDIFICIOS  = ['Básica','Media','Parvularia','Administración']
 MESES      = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
