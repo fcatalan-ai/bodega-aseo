@@ -416,7 +416,10 @@ function addFilaEditar(prod='', cant='', precio=''){
   c.appendChild(row);
 }
 
-function abrirEditarGuia(idx){
+async function abrirEditarGuia(idx){
+  // Asegurar que PRODUCTOS_BD esté cargado
+  if(!PRODUCTOS_BD.length) await cargarProductos();
+
   const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
   const g = guias[idx];
   if(!g) return;
