@@ -21,9 +21,9 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 .form-group input,.form-group select{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px}
 .form-group input:focus,.form-group select:focus{outline:none;border-color:#27500A}
 /* Tabla de items */
-.items-header{display:grid;grid-template-columns:1fr 80px 110px 90px 90px 100px 38px;gap:8px;padding:0 0 6px;border-bottom:1px solid #eee;margin-bottom:8px}
+.items-header{display:grid;grid-template-columns:1fr 90px 110px 90px 38px;gap:8px;padding:0 0 6px;border-bottom:1px solid #eee;margin-bottom:8px}
 .items-header span{font-size:11px;font-weight:700;color:#999;text-transform:uppercase}
-.item-row{display:grid;grid-template-columns:1fr 80px 110px 90px 90px 100px 38px;gap:8px;margin-bottom:8px;align-items:center}
+.item-row{display:grid;grid-template-columns:1fr 90px 110px 90px 38px;gap:8px;margin-bottom:8px;align-items:center}
 .item-row select,.item-row input{padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%}
 .item-row select:focus,.item-row input:focus{outline:none;border-color:#27500A}
 .btn-rm{background:#fff;border:1px solid #fcc;color:#c00;border-radius:7px;width:34px;height:34px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -44,6 +44,30 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 .chips{display:flex;flex-wrap:wrap;gap:5px}
 .chip{background:#E2EFDA;border:1px solid #a3d0a8;color:#27500A;border-radius:20px;padding:3px 10px;font-size:12px}
 .loading{text-align:center;padding:30px;color:#999;font-size:13px}
+.ge-card{background:#fff;border:0.5px solid #d0e8d8;border-radius:10px;overflow:hidden;margin-bottom:8px}
+.ge-header{display:grid;grid-template-columns:1fr auto;align-items:center;padding:11px 14px;cursor:pointer;gap:8px;transition:background 0.15s}
+.ge-header:hover{background:#f0f7f4}
+.ge-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ge-id{font-size:12px;font-weight:700;color:#27500A;background:#E2EFDA;padding:3px 10px;border-radius:20px}
+.ge-fecha{font-size:12px;color:#888}
+.ge-sep{font-size:12px;color:#ccc}
+.ge-info{font-size:12px;color:#666}
+.ge-total{font-size:12px;font-weight:700;color:#27500A}
+.ge-badge{font-size:11px;color:#888;background:#f0f0f0;padding:1px 7px;border-radius:10px}
+.ge-chevron{font-size:16px;color:#aaa;transition:transform 0.2s}
+.ge-detalle{display:none;border-top:0.5px solid #e0ede4}
+.ge-detalle-inner{padding:12px 14px}
+.ge-table{width:100%;border-collapse:collapse;font-size:12px}
+.ge-table th{font-size:11px;color:#888;text-transform:uppercase;padding:4px 6px;text-align:left;border-bottom:0.5px solid #eee;font-weight:600}
+.ge-table th:not(:first-child){text-align:right}
+.ge-table td{padding:5px 6px;border-bottom:0.5px solid #f5f5f5;color:#333}
+.ge-table td:not(:first-child){text-align:right}
+.ge-table tr:last-child td{border-bottom:none}
+.ge-table .cant{color:#888}
+.ge-table .neto{color:#888}
+.ge-table .civa{font-weight:600;color:#1a3d06}
+.ge-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:0.5px solid #eee}
+.ge-totales{display:flex;gap:16px;font-size:12px}
 .empty-guias{text-align:center;padding:30px;color:#aaa;font-size:13px}
 .btn-del-guia{background:#fff;border:1px solid #fcc;color:#c00;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
 .btn-del-guia:hover{background:#FCEBEB}
@@ -98,30 +122,18 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 
     <!-- TABLA DE PRODUCTOS -->
     <div style="margin-top:6px">
-      <div class="items-header" style="grid-template-columns:1fr 80px 110px 90px 90px 100px 38px">
+      <div class="items-header">
         <span>Producto</span>
         <span>Cantidad</span>
-        <span>Precio unit. neto ($)</span>
-        <span>IVA (19%)</span>
-        <span>Total neto</span>
-        <span>Total c/IVA</span>
+        <span>Precio unit. ($)</span>
+        <span>Total</span>
         <span></span>
       </div>
       <div id="items-container"></div>
       <button class="btn-add" onclick="addFila()">+ Agregar fila</button>
-      <div style="display:flex;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid #eee;gap:20px;align-items:center;flex-wrap:wrap">
-        <div style="text-align:right">
-          <div style="font-size:11px;color:#888">Total neto</div>
-          <div id="total-neto" style="font-size:15px;font-weight:700;color:#555">—</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:11px;color:#888">IVA (19%)</div>
-          <div id="total-iva" style="font-size:15px;font-weight:700;color:#888">—</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:11px;color:#666;font-weight:600">Total c/IVA</div>
-          <div id="total-general" style="font-size:17px;font-weight:700;color:#27500A">—</div>
-        </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:10px;padding-top:10px;border-top:1px solid #eee;gap:12px;align-items:center">
+        <span style="font-size:13px;color:#666;font-weight:600">Total guía:</span>
+        <span id="total-general" style="font-size:16px;font-weight:700;color:#27500A">—</span>
       </div>
     </div>
 
@@ -147,19 +159,9 @@ const PRODUCTOS_LISTA = ["Confort Chico","Confort Industrial 4x500","Nova Indust
 
 let productosMap = {};
 
-// Lista global de productos para el buscador
-let PRODUCTOS_BD = [];
-
-async function cargarProductosBD(){
-  const r = await fetch('/api/productos');
-  PRODUCTOS_BD = await r.json();
-  return PRODUCTOS_BD;
-}
-
 async function cargarProductos(){
   const r = await fetch('/api/productos');
   const prods = await r.json();
-  PRODUCTOS_BD = prods; // también actualiza PRODUCTOS_BD
   productosMap = {};
   prods.forEach(p=>{ productosMap[p.nombre] = {id: p.id, unidad: p.unidad, stock: p.stock_actual}; });
 }
@@ -175,112 +177,24 @@ function addFila(producto='', cantidad='', precio=''){
   const container = document.getElementById('items-container');
   const row = document.createElement('div');
   row.className = 'item-row';
-  row.style.position = 'relative';
 
-  // Input búsqueda con dropdown
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:relative';
-
-  const inp = document.createElement('input');
-  inp.type='text'; inp.placeholder='Buscar producto...';
-  inp.value = producto||'';
-  inp.autocomplete = 'off';
-  inp.style.cssText = 'width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px';
-
-  const dd = document.createElement('div');
-  dd.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 7px 7px;max-height:180px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.1)';
-
-  inp.oninput = ()=>{
-    const q = inp.value.toLowerCase().trim();
-    if(!q){ dd.style.display='none'; return; }
-    const matches = PRODUCTOS_BD.filter(p=>p.nombre.toLowerCase().includes(q));
-    if(!matches.length){ dd.style.display='none'; return; }
-    dd.innerHTML = '';
-    matches.slice(0,8).forEach(p=>{
-      const item = document.createElement('div');
-      item.style.cssText = 'padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between';
-      item.innerHTML = `<span>${p.nombre}</span><span style="font-size:11px;color:#888">${p.stock_actual} ${p.unidad}</span>`;
-      item.addEventListener('mouseover', ()=>item.style.background='#f0f7f4');
-      item.addEventListener('mouseout',  ()=>item.style.background='');
-      item.addEventListener('mousedown', (e)=>{
-        e.preventDefault();
-        inp.value = p.nombre;
-        dd.style.display = 'none';
-        dd.innerHTML = '';
-        inpCant.focus();
-      });
-      dd.appendChild(item);
-    });
-    dd.style.display='block';
-  };
-
-  inp.addEventListener('blur', ()=>{ setTimeout(()=>{ dd.style.display='none'; dd.querySelectorAll('div').forEach(i=>i.style.background=''); }, 150); });
-  inp.onfocus = ()=>{ if(inp.value) inp.oninput(); };
-
-  // Navegación con teclado
-  let idxSeleccionado = -1;
-  inp.addEventListener('keydown', (e)=>{
-    const items = [...dd.querySelectorAll('div')];
-    if(!items.length || dd.style.display==='none') return;
-    if(e.key==='ArrowDown'){
-      e.preventDefault();
-      idxSeleccionado = Math.min(idxSeleccionado+1, items.length-1);
-    } else if(e.key==='ArrowUp'){
-      e.preventDefault();
-      idxSeleccionado = Math.max(idxSeleccionado-1, 0);
-    } else if(e.key==='Enter'){
-      e.preventDefault();
-      if(idxSeleccionado>=0 && items[idxSeleccionado]){
-        items[idxSeleccionado].dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
-      }
-      return;
-    } else if(e.key==='Escape'){
-      dd.style.display='none'; idxSeleccionado=-1; return;
-    } else {
-      idxSeleccionado = -1; return;
-    }
-    items.forEach((it,i)=>{
-      it.style.background = i===idxSeleccionado ? '#c8e6d0' : '';
-    });
-  });
-
-
-  wrap.appendChild(inp);
-  wrap.appendChild(dd);
+  const sel = crearSelectProducto(producto);
 
   const inpCant = document.createElement('input');
   inpCant.type='number'; inpCant.min='1'; inpCant.placeholder='Cant.'; inpCant.value=cantidad||'';
-  inpCant.style.cssText='padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%';
 
   const inpPrecio = document.createElement('input');
   inpPrecio.type='number'; inpPrecio.min='0'; inpPrecio.placeholder='$ 0'; inpPrecio.value=precio||'';
-  inpPrecio.style.cssText='padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%;text-align:right';
-
-  const spanIVA = document.createElement('span');
-  spanIVA.style.cssText='font-size:12px;color:#888;text-align:right;padding:0 4px';
-  spanIVA.textContent='—';
-
-  const spanNeto = document.createElement('span');
-  spanNeto.style.cssText='font-size:12px;color:#555;text-align:right;padding:0 4px';
-  spanNeto.textContent='—';
+  inpPrecio.style.textAlign='right';
 
   const spanTotal = document.createElement('span');
-  spanTotal.style.cssText='font-size:13px;font-weight:700;color:#27500A;text-align:right;padding:0 4px';
+  spanTotal.style.cssText='font-size:13px;font-weight:600;color:#27500A;text-align:right;padding:0 4px';
   spanTotal.textContent='—';
 
   function actualizarTotal(){
     const c = parseInt(inpCant.value)||0;
     const p = parseInt(inpPrecio.value)||0;
-    if(c && p){
-      const neto = c*p;
-      const iva  = Math.round(neto*0.19);
-      const total = neto+iva;
-      spanNeto.textContent  = '$'+neto.toLocaleString('es-CL');
-      spanIVA.textContent   = '$'+iva.toLocaleString('es-CL');
-      spanTotal.textContent = '$'+total.toLocaleString('es-CL');
-    } else {
-      spanNeto.textContent='—'; spanIVA.textContent='—'; spanTotal.textContent='—';
-    }
+    spanTotal.textContent = (c && p) ? '$'+((c*p).toLocaleString('es-CL')) : '—';
     actualizarTotalGeneral();
   }
   inpCant.oninput = actualizarTotal;
@@ -290,44 +204,27 @@ function addFila(producto='', cantidad='', precio=''){
   btn.className='btn-rm'; btn.textContent='×';
   btn.onclick=()=>{
     if(container.children.length>1){ row.remove(); actualizarTotalGeneral(); }
-    else { inp.value=''; inpCant.value=''; inpPrecio.value=''; actualizarTotal(); }
+    else { sel.value=''; inpCant.value=''; inpPrecio.value=''; actualizarTotal(); }
   };
 
-  row.appendChild(wrap); row.appendChild(inpCant); row.appendChild(inpPrecio);
-  row.appendChild(spanIVA); row.appendChild(spanNeto); row.appendChild(spanTotal); row.appendChild(btn);
+  row.appendChild(sel); row.appendChild(inpCant); row.appendChild(inpPrecio);
+  row.appendChild(spanTotal); row.appendChild(btn);
   container.appendChild(row);
 
+  // Restaurar total si hay valores iniciales
   if(cantidad && precio) actualizarTotal();
 }
 
-function seleccionarProdFila(el, e){
-  e.preventDefault();
-  e.stopPropagation();
-  const row = el.closest('.item-row');
-  const inp = row.querySelector('input[type=text]');
-  const dd  = row.querySelector('div[style*="position:absolute"]');
-  inp.value = el.dataset.nombre;
-  dd.style.display='none';
-  inp.blur();
-}
-
 function actualizarTotalGeneral(){
-  let neto = 0;
+  let total = 0;
   document.querySelectorAll('#items-container .item-row').forEach(row=>{
-    const inputs = row.querySelectorAll('input[type=number]');
-    const c = parseInt(inputs[0]?.value)||0;
-    const p = parseInt(inputs[1]?.value)||0;
-    neto += c*p;
+    const inputs = row.querySelectorAll('input');
+    const c = parseInt(inputs[0].value)||0;
+    const p = parseInt(inputs[1].value)||0;
+    total += c*p;
   });
-  const iva   = Math.round(neto*0.19);
-  const total = neto+iva;
-  const fmt = v => v>0 ? '$'+v.toLocaleString('es-CL') : '—';
-  const elN = document.getElementById('total-neto');
-  const elI = document.getElementById('total-iva');
-  const elT = document.getElementById('total-general');
-  if(elN) elN.textContent = fmt(neto);
-  if(elI) elI.textContent = fmt(iva);
-  if(elT) elT.textContent = fmt(total);
+  const el = document.getElementById('total-general');
+  if(el) el.textContent = total>0 ? '$'+total.toLocaleString('es-CL') : '—';
 }
 
 function limpiarFormulario(){
@@ -337,7 +234,6 @@ function limpiarFormulario(){
   document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('items-container').innerHTML='';
   for(let i=0;i<5;i++) addFila();
-  actualizarTotalGeneral();
 }
 
 async function emitirGuia(){
@@ -351,10 +247,10 @@ async function emitirGuia(){
   const rows = document.querySelectorAll('#items-container .item-row');
   const items = [];
   rows.forEach(row=>{
-    const nombre   = (row.querySelector('input[type=text]')?.value||'').trim();
-    const inputs   = row.querySelectorAll('input[type=number]');
-    const cantidad = parseInt(inputs[0]?.value)||0;
-    const precio   = parseInt(inputs[1]?.value)||0;
+    const nombre   = row.querySelector('select').value;
+    const inputs   = row.querySelectorAll('input');
+    const cantidad = parseInt(inputs[0].value)||0;
+    const precio   = parseInt(inputs[1].value)||0;
     if(nombre && cantidad>0) items.push({nombre, cantidad, precio});
   });
   if(!items.length){ alert('Agrega al menos un producto con cantidad válida'); return; }
@@ -415,31 +311,63 @@ function renderGuias(){
     container.innerHTML='<div class="empty-guias">No hay guías de entrada registradas aún</div>';
     return;
   }
-  container.innerHTML = guias.map((g,idx)=>`
-    <div class="guia-item">
-      <div class="guia-header">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="guia-id">${g.id}</span>
-          <span style="font-size:12px;color:#888">${g.fecha}</span>
+  container.innerHTML = guias.map((g,idx)=>{
+    const neto  = g.items.reduce((s,it)=>(s+(it.cantidad*(it.precio||0))),0);
+    const iva   = Math.round(neto*0.19);
+    const total = g.total || (neto+iva);
+    const fmt   = v=>'$'+v.toLocaleString('es-CL');
+    const rows  = g.items.map(it=>{
+      const n = it.cantidad*(it.precio||0);
+      const c = Math.round(n*1.19);
+      return `<tr>
+        <td>${it.nombre}</td>
+        <td class="cant">×${it.cantidad}</td>
+        <td class="neto">${it.precio>0?fmt(it.precio):'—'}</td>
+        <td class="neto">${n>0?fmt(n):'—'}</td>
+        <td class="civa">${c>0?fmt(c):'—'}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="ge-card">
+      <div class="ge-header" onclick="toggleGE(this)">
+        <div class="ge-meta">
+          <span class="ge-id">${g.id}</span>
+          <span class="ge-fecha">${g.fecha}</span>
+          <span class="ge-sep">·</span>
+          <span class="ge-info">${g.responsable}</span>
+          ${g.proveedor?`<span class="ge-sep">·</span><span class="ge-info">${g.proveedor}</span>`:''}
+          ${g.obs?`<span class="ge-sep">·</span><span class="ge-info" style="color:#999;font-style:italic">${g.obs}</span>`:''}
+          <span class="ge-sep">·</span>
+          <span class="ge-total">${fmt(total)}</span>
+          <span class="ge-badge">${g.items.length} producto${g.items.length>1?'s':''}</span>
         </div>
-        <button class="btn-del-guia" onclick="eliminarGuia(${idx})">🗑️ Eliminar</button>
+        <i class="ge-chevron">⌄</i>
       </div>
-      <div class="guia-meta">
-        <strong>${g.responsable}</strong>
-        ${g.proveedor ? ` · Proveedor: <strong>${g.proveedor}</strong>` : ''}
-        ${g.obs ? ` · <em style="color:#888">${g.obs}</em>` : ''}
+      <div class="ge-detalle">
+        <div class="ge-detalle-inner">
+          <table class="ge-table">
+            <thead><tr><th>Producto</th><th>Cant.</th><th>P. Unit neto</th><th>Total neto</th><th>Total c/IVA</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="ge-footer">
+            <button class="btn-del-guia" onclick="eliminarGuia(${idx})">🗑️ Eliminar guía</button>
+            <div class="ge-totales">
+              <span style="color:#888">Neto: ${fmt(neto)}</span>
+              <span style="color:#888">IVA: ${fmt(iva)}</span>
+              <span style="font-weight:700;color:#27500A">Total c/IVA: ${fmt(total)}</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="chips">
-        ${g.items.map(it=>{
-          const neto = it.precio||0;
-          const iva  = Math.round(neto*0.19);
-          const total = neto+iva;
-          return `<span class="chip">📥 ${it.nombre} ×${it.cantidad}${neto>0?' · Neto $'+neto.toLocaleString('es-CL')+' · c/IVA $'+total.toLocaleString('es-CL'):''}`;
-        }).join('')}
-      </div>
-      ${g.total>0?`<div style="margin-top:8px;text-align:right;font-size:13px;font-weight:700;color:#27500A">Total: $${g.total.toLocaleString('es-CL')}</div>`:''}
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+}
+
+function toggleGE(header){
+  const detalle = header.nextElementSibling;
+  const icono   = header.querySelector('.ge-chevron');
+  const abierto = detalle.style.display !== 'none';
+  detalle.style.display = abierto ? 'none' : 'block';
+  icono.style.transform = abierto ? '' : 'rotate(180deg)';
 }
 
 function eliminarGuia(idx){
@@ -453,10 +381,8 @@ function eliminarGuia(idx){
 // Inicializar
 document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
 limpiarFormulario();
-cargarProductos().then(()=>{
-  limpiarFormulario();
-  renderGuias();
-});
+cargarProductos();
+renderGuias();
 </script>
 </body>
 </html>
