@@ -85,22 +85,14 @@ tr:hover td{background:#f0f7f4}
   <h1>🧴 Bodega de Aseo — Colegio</h1>
   <div class="topbar-links">
     <span>🧴 Bodega de Aseo</span>
-    {% if rol == 'admin' %}
     <a href="/dashboard" class="dash">📊 Dashboard</a>
-    {% endif %}
     <a href="/movimientos" style="color:#A8D5C5">📋 Movimientos</a>
-    {% if rol == 'admin' %}
     <a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>
-    {% endif %}
     <a href="/guia" style="color:#90caf9">📄 Guía Salida</a>
-    {% if rol == 'admin' %}
     <a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>
-    <a href="/admin/usuarios" style="color:#c8a2f8">👥 Usuarios</a>
-    {% endif %}
     <a href="/logout">Salir</a>
   </div>
 </div>
-
 
 <div class="main">
   <div class="stats" id="stats-row">
@@ -232,9 +224,13 @@ tr:hover td{background:#f0f7f4}
     <input type="hidden" id="prod-id">
     <div class="form-group" style="margin-bottom:12px">
       <label>Producto *</label>
-      <select id="prod-nombre">
-        <option value="">— Seleccionar producto —</option>
-      </select>
+      <div style="position:relative">
+        <input type="text" id="prod-nombre" placeholder="Busca un producto o escribe uno nuevo..."
+          autocomplete="off"
+          style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px">
+        <div id="prod-nombre-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 7px 7px;max-height:200px;overflow-y:auto;z-index:500;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+        <div id="prod-nombre-hint" style="font-size:11px;color:#888;margin-top:4px"></div>
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Categoría</label>
@@ -414,27 +410,28 @@ async function guardarMovimiento(){
   abrirPanel(productoActual.id);
 }
 
-function poblarSelectProducto(){
-  const sel = document.getElementById('prod-nombre');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">— Seleccionar producto —</option>';
-  PRODUCTOS_LISTA.forEach(p=>{
-    const o=document.createElement('option');
-    o.value=p; o.textContent=p;
-    sel.appendChild(o);
-  });
-  sel.value=cur;
-}
+function poblarSelectProducto(){ /* reemplazado por dropdown dinámico */ }
 
 function abrirModalProducto(){
-  poblarSelectProducto();
   document.getElementById('prod-title').textContent = 'Nuevo Producto';
   document.getElementById('prod-id').value = '';
   document.getElementById('prod-nombre').value = '';
+  document.getElementById('prod-nombre-hint').textContent = '';
+  document.getElementById('prod-nombre-dd').style.display = 'none';
+  document.getElementById('prod-cat').value = 'Varios';
+  document.getElementById('prod-unidad').value = 'unidades';
   document.getElementById('prod-stock').value = 0;
   document.getElementById('prod-minimo').value = 0;
   document.getElementById('modal-producto').classList.add('show');
+  setTimeout(()=>{
+    const inp = document.getElementById('prod-nombre');
+    inp.oninput = ()=>filtrarProductosModal(inp.value);
+    inp.onfocus = ()=>{ if(inp.value) filtrarProductosModal(inp.value); };
+    inp.addEventListener('blur',()=>setTimeout(()=>{ document.getElementById('prod-nombre-dd').style.display='none'; },150), {once:true});
+    inp.focus();
+  }, 100);
 }
+
 
 function abrirEditarProducto(){
   if(!productoActual) return;
