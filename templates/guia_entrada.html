@@ -72,7 +72,6 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 .ge-totales{display:flex;gap:16px;font-size:12px}
 .empty-guias{text-align:center;padding:30px;color:#aaa;font-size:13px}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:none;align-items:center;justify-content:center}
-.modal-bg.show{display:flex!important}
 .modal-bg.show{display:flex}
 .modal-edit{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:700px;max-height:90vh;overflow-y:auto;margin:16px}
 .modal-edit h3{font-size:16px;font-weight:700;margin-bottom:4px;color:#1a6b52}
@@ -165,7 +164,7 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 </div>
 
 <!-- MODAL EDITAR GUÍA -->
-<div class="modal-bg" id="modal-editar-guia">
+<div class="modal-bg" id="modal-editar-guia" style="display:none">
   <div class="modal-edit">
     <h3>✏️ Editar guía de entrada</h3>
     <p style="font-size:12px;color:#888;margin-bottom:14px">Los cambios ajustarán el stock automáticamente</p>
@@ -208,9 +207,12 @@ const PRODUCTOS_LISTA = ["Confort Chico","Confort Industrial 4x500","Nova Indust
 
 let productosMap = {};
 
+let PRODUCTOS_BD = [];
+
 async function cargarProductos(){
   const r = await fetch('/api/productos');
   const prods = await r.json();
+  PRODUCTOS_BD = prods;
   productosMap = {};
   prods.forEach(p=>{ productosMap[p.nombre] = {id: p.id, unidad: p.unidad, stock: p.stock_actual}; });
 }
@@ -499,19 +501,11 @@ function eliminarGuia(idx){
 
 /* ── EDITAR GUÍA ─────────────────────────────────────────── */
 function abrirEditarGuia(idx){
-  if(!PRODUCTOS_BD.length){
-    cargarProductos().then(()=>_abrirEditarGuiaReal(idx));
-  } else {
-    _abrirEditarGuiaReal(idx);
-  }
-}
-
-function _abrirEditarGuiaReal(idx){
   const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
   const g = guias[idx];
-  if(!g) return;
+  if(!g){ alert('Error: guía no encontrada'); return; }
 
-  document.getElementById('edit-guia-idx').value = idx;
+  document.getElementById('edit-guia-idx').value    = idx;
   document.getElementById('edit-responsable').value = g.responsable||'';
   document.getElementById('edit-proveedor').value   = g.proveedor||'';
   document.getElementById('edit-obs').value         = g.obs||'';
@@ -528,11 +522,12 @@ function _abrirEditarGuiaReal(idx){
   g.items.forEach(it => addFilaEditar(it.nombre, it.cantidad, it.precio||''));
 
   document.getElementById('edit-status').textContent = '';
-  document.getElementById('modal-editar-guia').classList.add('show');
+  const modal = document.getElementById('modal-editar-guia');
+  modal.style.display = 'flex';
 }
 
 function cerrarModalEditar(){
-  document.getElementById('modal-editar-guia').classList.remove('show');
+  document.getElementById('modal-editar-guia').style.display = 'none';
 }
 
 function addFilaEditar(prod='', cant='', precio=''){
