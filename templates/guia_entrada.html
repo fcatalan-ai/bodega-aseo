@@ -67,8 +67,17 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 .ge-table .neto{color:#888}
 .ge-table .civa{font-weight:600;color:#1a3d06}
 .ge-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:0.5px solid #eee}
+.btn-edit-guia{background:#fff;border:1px solid #b5d4f4;color:#0C447C;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:6px}
+.btn-edit-guia:hover{background:#E6F1FB}
 .ge-totales{display:flex;gap:16px;font-size:12px}
 .empty-guias{text-align:center;padding:30px;color:#aaa;font-size:13px}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal-edit{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:700px;max-height:90vh;overflow-y:auto;margin:16px}
+.modal-edit h3{font-size:16px;font-weight:700;margin-bottom:4px;color:#1a6b52}
+.edit-items-header{display:grid;grid-template-columns:1fr 80px 110px 38px;gap:8px;font-size:11px;color:#999;text-transform:uppercase;font-weight:700;padding:0 0 6px;border-bottom:1px solid #eee;margin:14px 0 8px}
+.edit-item-row{display:grid;grid-template-columns:1fr 80px 110px 38px;gap:8px;margin-bottom:8px;align-items:center}
+.edit-item-row input{padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%}
 .btn-del-guia{background:#fff;border:1px solid #fcc;color:#c00;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
 .btn-del-guia:hover{background:#FCEBEB}
 .info-box{background:#E2EFDA;border:1px solid #a3d0a8;border-radius:7px;padding:10px 14px;font-size:13px;color:#27500A;margin-bottom:12px}
@@ -152,6 +161,45 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
     <div id="guias-lista"><div class="loading">Cargando...</div></div>
   </div>
 
+</div>
+
+<!-- MODAL EDITAR GUÍA -->
+<div class="modal-bg" id="modal-editar-guia">
+  <div class="modal-edit">
+    <h3>✏️ Editar guía de entrada</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:14px">Los cambios ajustarán el stock automáticamente</p>
+    <input type="hidden" id="edit-guia-idx">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Responsable</label>
+        <input type="text" id="edit-responsable">
+      </div>
+      <div class="form-group">
+        <label>Proveedor</label>
+        <input type="text" id="edit-proveedor">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="edit-fecha">
+      </div>
+      <div class="form-group">
+        <label>N° Factura / Observaciones</label>
+        <input type="text" id="edit-obs">
+      </div>
+    </div>
+    <div class="edit-items-header">
+      <span>Producto</span><span>Cantidad</span><span>Precio neto</span><span></span>
+    </div>
+    <div id="edit-items-container"></div>
+    <button class="btn-add" onclick="addFilaEditar()">+ Agregar producto</button>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+      <button class="btn-out" onclick="cerrarModalEditar()">Cancelar</button>
+      <button class="btn-entrada" onclick="guardarEdicion()">💾 Guardar cambios</button>
+    </div>
+    <div id="edit-status" style="font-size:12px;color:#888;margin-top:8px;text-align:center"></div>
+  </div>
 </div>
 
 <script>
@@ -303,6 +351,144 @@ async function emitirGuia(){
   renderGuias();
 }
 
+function cerrarModalEditar(){
+  document.getElementById('modal-editar-guia').classList.remove('show');
+}
+
+function addFilaEditar(prod='', cant='', precio=''){
+  const c = document.getElementById('edit-items-container');
+  const row = document.createElement('div');
+  row.className = 'edit-item-row';
+
+  const inpProd = document.createElement('input');
+  inpProd.type='text'; inpProd.placeholder='Nombre del producto'; inpProd.value=prod;
+
+  const inpCant = document.createElement('input');
+  inpCant.type='number'; inpCant.min='1'; inpCant.placeholder='Cant.'; inpCant.value=cant||'';
+
+  const inpPrecio = document.createElement('input');
+  inpPrecio.type='number'; inpPrecio.min='0'; inpPrecio.placeholder='$ neto'; inpPrecio.value=precio||'';
+  inpPrecio.style.textAlign='right';
+
+  const btn = document.createElement('button');
+  btn.className='btn-rm'; btn.textContent='×';
+  btn.onclick=()=>{ if(c.children.length>1) row.remove(); };
+
+  row.appendChild(inpProd); row.appendChild(inpCant); row.appendChild(inpPrecio); row.appendChild(btn);
+  c.appendChild(row);
+}
+
+function abrirEditarGuia(idx){
+  const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
+  const g = guias[idx];
+  if(!g) return;
+
+  document.getElementById('edit-guia-idx').value = idx;
+  document.getElementById('edit-responsable').value = g.responsable||'';
+  document.getElementById('edit-proveedor').value = g.proveedor||'';
+  document.getElementById('edit-obs').value = g.obs||'';
+
+  // Convertir fecha DD-MM-YYYY a YYYY-MM-DD para input date
+  const partes = (g.fecha||'').split('-');
+  if(partes.length===3 && partes[2].length===4){
+    document.getElementById('edit-fecha').value = `${partes[2]}-${partes[1]}-${partes[0]}`;
+  } else {
+    document.getElementById('edit-fecha').value = g.fecha||'';
+  }
+
+  const c = document.getElementById('edit-items-container');
+  c.innerHTML='';
+  g.items.forEach(it=>addFilaEditar(it.nombre, it.cantidad, it.precio||''));
+
+  document.getElementById('edit-status').textContent='';
+  document.getElementById('modal-editar-guia').classList.add('show');
+}
+
+async function guardarEdicion(){
+  const idx = parseInt(document.getElementById('edit-guia-idx').value);
+  const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
+  const gOld = guias[idx];
+  if(!gOld) return;
+
+  // Leer nuevos items
+  const rows = document.getElementById('edit-items-container').querySelectorAll('.edit-item-row');
+  const itemsNew = [];
+  rows.forEach(row=>{
+    const inputs = row.querySelectorAll('input');
+    const nombre   = inputs[0].value.trim();
+    const cantidad = parseInt(inputs[1].value)||0;
+    const precio   = parseInt(inputs[2].value)||0;
+    if(nombre && cantidad>0) itemsNew.push({nombre, cantidad, precio});
+  });
+
+  if(!itemsNew.length){ alert('Agrega al menos un producto'); return; }
+
+  const status = document.getElementById('edit-status');
+  status.textContent='⏳ Ajustando stock...';
+
+  // Calcular diferencias de stock
+  const mapOld = {};
+  gOld.items.forEach(it=>{ mapOld[it.nombre] = (mapOld[it.nombre]||0) + it.cantidad; });
+  const mapNew = {};
+  itemsNew.forEach(it=>{ mapNew[it.nombre] = (mapNew[it.nombre]||0) + it.cantidad; });
+
+  // Productos a restar (estaban antes, ya no o menos cantidad)
+  const todosProds = new Set([...Object.keys(mapOld), ...Object.keys(mapNew)]);
+  let errores = 0;
+
+  await cargarProductos(); // refrescar productosMap
+
+  for(const nombre of todosProds){
+    const cantOld = mapOld[nombre]||0;
+    const cantNew = mapNew[nombre]||0;
+    const diff = cantNew - cantOld; // positivo = sumar, negativo = restar
+    if(diff === 0) continue;
+
+    const prod = productosMap[nombre];
+    if(!prod){ status.textContent=`⚠️ Producto "${nombre}" no encontrado en inventario`; errores++; continue; }
+
+    const tipo = diff > 0 ? 'entrada' : 'salida';
+    const r = await fetch('/api/movimientos', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        producto_id: prod.id,
+        tipo,
+        cantidad: Math.abs(diff),
+        edificio: '',
+        observacion: `[Edición guía ${gOld.id}]`,
+        fecha: new Date().toLocaleDateString('es-CL').replace(/\//g,'-')
+      })
+    });
+    const d = await r.json();
+    if(d.error){ errores++; }
+  }
+
+  // Actualizar guía en localStorage
+  const fechaInput = document.getElementById('edit-fecha').value;
+  const partes = fechaInput.split('-');
+  const fechaFmt = partes.length===3 ? `${partes[2]}-${partes[1]}-${partes[0]}` : fechaInput;
+  const totalNuevo = itemsNew.reduce((s,it)=>s+(it.cantidad*(it.precio||0)*1.19),0);
+
+  guias[idx] = {
+    ...gOld,
+    responsable: document.getElementById('edit-responsable').value.trim(),
+    proveedor:   document.getElementById('edit-proveedor').value.trim(),
+    obs:         document.getElementById('edit-obs').value.trim(),
+    fecha:       fechaFmt,
+    items:       itemsNew,
+    total:       Math.round(totalNuevo)
+  };
+  localStorage.setItem('bodega_guias_entrada', JSON.stringify(guias));
+
+  if(errores===0){
+    status.textContent='✅ Cambios guardados correctamente';
+  } else {
+    status.textContent=`⚠️ Guardado con ${errores} advertencia(s)`;
+  }
+  setTimeout(()=>{ cerrarModalEditar(); renderGuias(); }, 1500);
+}
+
 function renderGuias(){
   const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
   const container = document.getElementById('guias-lista');
@@ -349,7 +535,10 @@ function renderGuias(){
             <tbody>${rows}</tbody>
           </table>
           <div class="ge-footer">
-            <button class="btn-del-guia" onclick="eliminarGuia(${idx})">🗑️ Eliminar guía</button>
+            <div style="display:flex;gap:6px">
+              <button class="btn-edit-guia" onclick="abrirEditarGuia(${idx})">✏️ Editar guía</button>
+              <button class="btn-del-guia" onclick="eliminarGuia(${idx})">🗑️ Eliminar guía</button>
+            </div>
             <div class="ge-totales">
               <span style="color:#888">Neto: ${fmt(neto)}</span>
               <span style="color:#888">IVA: ${fmt(iva)}</span>
