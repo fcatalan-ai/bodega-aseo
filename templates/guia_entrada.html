@@ -416,7 +416,12 @@ function addFilaEditar(prod='', cant='', precio=''){
   c.appendChild(row);
 }
 
-async function abrirEditarGuia(idx){
+function abrirEditarGuia(idx){
+  // Wrapper síncrono que llama a la función async
+  _abrirEditarGuiaAsync(idx).catch(e=>console.error(e));
+}
+
+async function _abrirEditarGuiaAsync(idx){
   // Asegurar que PRODUCTOS_BD esté cargado
   if(!PRODUCTOS_BD.length) await cargarProductos();
 
