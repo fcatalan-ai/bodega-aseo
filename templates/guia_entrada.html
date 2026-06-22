@@ -600,7 +600,7 @@ function renderGuias(){
 function toggleGE(header){
   const detalle = header.nextElementSibling;
   const icono   = header.querySelector('.ge-chevron');
-  const abierto = detalle.style.display !== 'none';
+  const abierto = detalle.style.display === 'block';
   detalle.style.display = abierto ? 'none' : 'block';
   icono.style.transform = abierto ? '' : 'rotate(180deg)';
 }
@@ -613,11 +613,188 @@ function eliminarGuia(idx){
   renderGuias();
 }
 
+/* ── EDITAR GUÍA ─────────────────────────────────────────── */
+function abrirEditarGuia(idx){
+  if(!PRODUCTOS_BD.length){
+    cargarProductos().then(()=>_abrirEditarGuiaReal(idx));
+  } else {
+    _abrirEditarGuiaReal(idx);
+  }
+}
+
+function _abrirEditarGuiaReal(idx){
+  const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
+  const g = guias[idx];
+  if(!g) return;
+
+  document.getElementById('edit-guia-idx').value = idx;
+  document.getElementById('edit-responsable').value = g.responsable||'';
+  document.getElementById('edit-proveedor').value   = g.proveedor||'';
+  document.getElementById('edit-obs').value         = g.obs||'';
+
+  const partes = (g.fecha||'').split('-');
+  if(partes.length===3 && partes[2].length===4){
+    document.getElementById('edit-fecha').value = `${partes[2]}-${partes[1]}-${partes[0]}`;
+  } else {
+    document.getElementById('edit-fecha').value = g.fecha||'';
+  }
+
+  const c = document.getElementById('edit-items-container');
+  c.innerHTML = '';
+  g.items.forEach(it => addFilaEditar(it.nombre, it.cantidad, it.precio||''));
+
+  document.getElementById('edit-status').textContent = '';
+  document.getElementById('modal-editar-guia').classList.add('show');
+}
+
+function cerrarModalEditar(){
+  document.getElementById('modal-editar-guia').classList.remove('show');
+}
+
+function addFilaEditar(prod='', cant='', precio=''){
+  const c = document.getElementById('edit-items-container');
+  const row = document.createElement('div');
+  row.className = 'edit-item-row';
+
+  // Wrap con dropdown
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:relative';
+
+  const inpProd = document.createElement('input');
+  inpProd.type = 'text';
+  inpProd.placeholder = 'Buscar producto...';
+  inpProd.value = prod;
+  inpProd.autocomplete = 'off';
+  inpProd.style.cssText = 'width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px';
+
+  const dd = document.createElement('div');
+  dd.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 7px 7px;max-height:180px;overflow-y:auto;z-index:500;box-shadow:0 4px 12px rgba(0,0,0,0.1)';
+
+  inpProd.addEventListener('input', ()=>{
+    const q = inpProd.value.toLowerCase().trim();
+    if(!q){ dd.style.display='none'; return; }
+    const matches = PRODUCTOS_BD.filter(p=>p.nombre.toLowerCase().includes(q));
+    dd.innerHTML = '';
+    if(!matches.length){ dd.style.display='none'; return; }
+    matches.slice(0,8).forEach(p=>{
+      const item = document.createElement('div');
+      item.style.cssText = 'padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between';
+      item.innerHTML = `<span>${p.nombre}</span><span style="font-size:11px;color:#888">${p.stock_actual} ${p.unidad}</span>`;
+      item.addEventListener('mouseover', ()=>item.style.background='#f0f7f4');
+      item.addEventListener('mouseout',  ()=>item.style.background='');
+      item.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
+        inpProd.value = p.nombre;
+        dd.style.display = 'none';
+        inpCant.focus();
+      });
+      dd.appendChild(item);
+    });
+    dd.style.display = 'block';
+  });
+  dd.addEventListener('mousedown', e=>e.preventDefault());
+  inpProd.addEventListener('blur', ()=>setTimeout(()=>dd.style.display='none', 150));
+
+  wrap.appendChild(inpProd);
+  wrap.appendChild(dd);
+
+  const inpCant = document.createElement('input');
+  inpCant.type='number'; inpCant.min='1';
+  inpCant.placeholder='Cant.'; inpCant.value=cant||'';
+  inpCant.style.cssText='padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%';
+
+  const inpPrecio = document.createElement('input');
+  inpPrecio.type='number'; inpPrecio.min='0';
+  inpPrecio.placeholder='$ neto'; inpPrecio.value=precio||'';
+  inpPrecio.style.cssText='padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%;text-align:right';
+
+  const btn = document.createElement('button');
+  btn.className='btn-rm'; btn.textContent='×';
+  btn.onclick = ()=>{ if(c.children.length>1) row.remove(); };
+
+  row.appendChild(wrap);
+  row.appendChild(inpCant);
+  row.appendChild(inpPrecio);
+  row.appendChild(btn);
+  c.appendChild(row);
+}
+
+async function guardarEdicion(){
+  const idx = parseInt(document.getElementById('edit-guia-idx').value);
+  const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
+  const gOld = guias[idx];
+  if(!gOld) return;
+
+  const rows = document.getElementById('edit-items-container').querySelectorAll('.edit-item-row');
+  const itemsNew = [];
+  rows.forEach(row=>{
+    const nombre   = (row.querySelector('input[type=text]')?.value||'').trim();
+    const numInps  = row.querySelectorAll('input[type=number]');
+    const cantidad = parseInt(numInps[0]?.value)||0;
+    const precio   = parseInt(numInps[1]?.value)||0;
+    if(nombre && cantidad>0) itemsNew.push({nombre, cantidad, precio});
+  });
+  if(!itemsNew.length){ alert('Agrega al menos un producto'); return; }
+
+  const status = document.getElementById('edit-status');
+  status.textContent = '⏳ Ajustando stock...';
+
+  const mapOld = {};
+  gOld.items.forEach(it=>{ mapOld[it.nombre] = (mapOld[it.nombre]||0) + it.cantidad; });
+  const mapNew = {};
+  itemsNew.forEach(it=>{ mapNew[it.nombre] = (mapNew[it.nombre]||0) + it.cantidad; });
+
+  await cargarProductos();
+
+  const todosProds = new Set([...Object.keys(mapOld), ...Object.keys(mapNew)]);
+  let errores = 0;
+
+  for(const nombre of todosProds){
+    const cantOld = mapOld[nombre]||0;
+    const cantNew = mapNew[nombre]||0;
+    const diff = cantNew - cantOld;
+    if(diff === 0) continue;
+    const prod = productosMap[nombre];
+    if(!prod){ errores++; continue; }
+    const r = await fetch('/api/movimientos',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        producto_id: prod.id,
+        tipo: diff>0 ? 'entrada' : 'salida',
+        cantidad: Math.abs(diff),
+        edificio:'',
+        observacion:`[Edición guía ${gOld.id}]`,
+        fecha: new Date().toLocaleDateString('es-CL').replace(/\//g,'-')
+      })
+    });
+    const d = await r.json();
+    if(d.error) errores++;
+  }
+
+  const fechaInput = document.getElementById('edit-fecha').value;
+  const partes = fechaInput.split('-');
+  const fechaFmt = partes.length===3 ? `${partes[2]}-${partes[1]}-${partes[0]}` : fechaInput;
+  const totalNuevo = Math.round(itemsNew.reduce((s,it)=>s+(it.cantidad*(it.precio||0)*1.19),0));
+
+  guias[idx] = {
+    ...gOld,
+    responsable: document.getElementById('edit-responsable').value.trim(),
+    proveedor:   document.getElementById('edit-proveedor').value.trim(),
+    obs:         document.getElementById('edit-obs').value.trim(),
+    fecha:       fechaFmt,
+    items:       itemsNew,
+    total:       totalNuevo
+  };
+  localStorage.setItem('bodega_guias_entrada', JSON.stringify(guias));
+
+  status.textContent = errores===0 ? '✅ Cambios guardados' : `⚠️ Guardado con ${errores} advertencia(s)`;
+  setTimeout(()=>{ cerrarModalEditar(); renderGuias(); }, 1200);
+}
+/* ─────────────────────────────────────────────────────────── */
+
 // Inicializar
 document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
-limpiarFormulario();
-cargarProductos();
-renderGuias();
+cargarProductos().then(()=>{ limpiarFormulario(); renderGuias(); });
 </script>
 </body>
 </html>
