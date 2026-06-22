@@ -464,8 +464,8 @@ function renderGuias(){
           </table>
           <div class="ge-footer">
             <div style="display:flex;gap:6px">
-              <button class="btn-edit-guia" onclick="abrirEditarGuia(${idx})">✏️ Editar guía</button>
-              <button class="btn-del-guia" onclick="eliminarGuia(${idx})">🗑️ Eliminar guía</button>
+              <button class="btn-edit-guia" onclick="event.stopPropagation();abrirEditarGuia(${idx})">✏️ Editar guía</button>
+              <button class="btn-del-guia" onclick="event.stopPropagation();eliminarGuia(${idx})">🗑️ Eliminar guía</button>
             </div>
             <div class="ge-totales">
               <span style="color:#888">Neto: ${fmt(neto)}</span>
