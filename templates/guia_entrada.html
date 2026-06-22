@@ -72,6 +72,7 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 .ge-totales{display:flex;gap:16px;font-size:12px}
 .empty-guias{text-align:center;padding:30px;color:#aaa;font-size:13px}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-bg.show{display:flex!important}
 .modal-bg.show{display:flex}
 .modal-edit{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:700px;max-height:90vh;overflow-y:auto;margin:16px}
 .modal-edit h3{font-size:16px;font-weight:700;margin-bottom:4px;color:#1a6b52}
@@ -485,6 +486,7 @@ function toggleGE(header){
   const abierto = detalle.style.display === 'block';
   detalle.style.display = abierto ? 'none' : 'block';
   icono.style.transform = abierto ? '' : 'rotate(180deg)';
+  icono.textContent     = abierto ? '⌄' : '⌃';
 }
 
 function eliminarGuia(idx){
