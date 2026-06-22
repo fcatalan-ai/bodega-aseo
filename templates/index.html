@@ -426,17 +426,15 @@ function abrirModalProducto(){
   setTimeout(()=>document.getElementById('prod-nombre').focus(), 100);
 }
 
-// Inicializar eventos del input de producto UNA SOLA VEZ al cargar
-(function(){
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const inp = document.getElementById('prod-nombre');
-    if(!inp) return;
-    const dd = document.getElementById('prod-nombre-dd');
-    inp.addEventListener('input', ()=>filtrarProductosModal(inp.value));
-    inp.addEventListener('focus', ()=>{ if(inp.value) filtrarProductosModal(inp.value); });
-    dd.addEventListener('mousedown', e=>e.preventDefault());
-    inp.addEventListener('blur', ()=>{ setTimeout(()=>dd.style.display='none', 150); });
-  });
+// Inicializar eventos del input de producto
+(function iniciarInputProducto(){
+  const inp = document.getElementById('prod-nombre');
+  const dd  = document.getElementById('prod-nombre-dd');
+  if(!inp || !dd){ setTimeout(iniciarInputProducto, 200); return; }
+  inp.addEventListener('input', ()=>filtrarProductosModal(inp.value));
+  inp.addEventListener('focus', ()=>{ if(inp.value) filtrarProductosModal(inp.value); });
+  dd.addEventListener('mousedown', e=>e.preventDefault());
+  inp.addEventListener('blur',  ()=>{ setTimeout(()=>dd.style.display='none', 150); });
 })();
 
 
