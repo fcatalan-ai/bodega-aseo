@@ -203,8 +203,6 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 </div>
 
 <script>
-const PRODUCTOS_LISTA = ["Confort Chico","Confort Industrial 4x500","Nova Industrial 2x250","Bolsa Basura 50x70","Bolsa Basura 70x90","Bolsa Basura 80x110","Bolsa Basura 120x130","Cloro","Cloro Gel","Limpia Piso","Crema Cif","Lavalosa","Limpia Vidrio","Lustra-Mueble","Jabon Liquido Bidon","Desodorante Ambiental","Lysoform","Toalla Desinfectante","Alcohol Liquido","Alcohol Gel","Esponja","Paño Multiuso 3x1","Paño Chico Microfibra","Trapero Microfibra C/Ojal","Mopa Algodón (Chas)","Mopa Seca (Avion)","Disco Pulidores Rojo","Cera Sachet","Cera Liquida Roja","Cera Liquida Incolora","Liquido Piso Flotante","Escobillon","Escobillon Barra Agua","Virutilla Piso","Palas","Plumeros","Guantes - S/7","Guantes - M/8","Guantes L/9","Guantes G/10","Atomizador Plasticos"];
-
 let productosMap = {};
 
 async function cargarProductos(){
@@ -212,13 +210,25 @@ async function cargarProductos(){
   const prods = await r.json();
   productosMap = {};
   prods.forEach(p=>{ productosMap[p.nombre] = {id: p.id, unidad: p.unidad, stock: p.stock_actual}; });
+  // Actualizar todos los selects existentes con la lista actualizada
+  actualizarTodosLosSelects();
 }
 
 function crearSelectProducto(val=''){
   const sel = document.createElement('select');
+  const nombres = Object.keys(productosMap).sort((a,b)=>a.localeCompare(b,'es'));
   sel.innerHTML = '<option value="">— Seleccionar producto —</option>' +
-    PRODUCTOS_LISTA.map(p=>`<option value="${p}"${p===val?' selected':''}>${p}</option>`).join('');
+    nombres.map(p=>`<option value="${p}"${p===val?' selected':''}>${p}</option>`).join('');
   return sel;
+}
+
+function actualizarTodosLosSelects(){
+  const nombres = Object.keys(productosMap).sort((a,b)=>a.localeCompare(b,'es'));
+  document.querySelectorAll('#items-container .item-row select').forEach(sel => {
+    const valActual = sel.value;
+    sel.innerHTML = '<option value="">— Seleccionar producto —</option>' +
+      nombres.map(p=>`<option value="${p}"${p===valActual?' selected':''}>${p}</option>`).join('');
+  });
 }
 
 function addFila(producto='', cantidad='', precio=''){
@@ -569,8 +579,8 @@ function eliminarGuia(idx){
 
 // Inicializar
 document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
-limpiarFormulario();
-cargarProductos();
+// Cargar productos primero, luego inicializar filas con la lista real de inventario
+cargarProductos().then(() => { limpiarFormulario(); });
 renderGuias();
 </script>
 </body>
