@@ -423,14 +423,21 @@ function abrirModalProducto(){
   document.getElementById('prod-stock').value = 0;
   document.getElementById('prod-minimo').value = 0;
   document.getElementById('modal-producto').classList.add('show');
-  setTimeout(()=>{
-    const inp = document.getElementById('prod-nombre');
-    inp.oninput = ()=>filtrarProductosModal(inp.value);
-    inp.onfocus = ()=>{ if(inp.value) filtrarProductosModal(inp.value); };
-    inp.addEventListener('blur',()=>setTimeout(()=>{ document.getElementById('prod-nombre-dd').style.display='none'; },150), {once:true});
-    inp.focus();
-  }, 100);
+  setTimeout(()=>document.getElementById('prod-nombre').focus(), 100);
 }
+
+// Inicializar eventos del input de producto UNA SOLA VEZ al cargar
+(function(){
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const inp = document.getElementById('prod-nombre');
+    if(!inp) return;
+    const dd = document.getElementById('prod-nombre-dd');
+    inp.addEventListener('input', ()=>filtrarProductosModal(inp.value));
+    inp.addEventListener('focus', ()=>{ if(inp.value) filtrarProductosModal(inp.value); });
+    dd.addEventListener('mousedown', e=>e.preventDefault());
+    inp.addEventListener('blur', ()=>{ setTimeout(()=>dd.style.display='none', 150); });
+  });
+})();
 
 
 function abrirEditarProducto(){
