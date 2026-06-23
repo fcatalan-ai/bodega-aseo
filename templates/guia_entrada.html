@@ -44,40 +44,7 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 .chips{display:flex;flex-wrap:wrap;gap:5px}
 .chip{background:#E2EFDA;border:1px solid #a3d0a8;color:#27500A;border-radius:20px;padding:3px 10px;font-size:12px}
 .loading{text-align:center;padding:30px;color:#999;font-size:13px}
-.ge-card{background:#fff;border:0.5px solid #d0e8d8;border-radius:10px;overflow:hidden;margin-bottom:8px}
-.ge-header{display:grid;grid-template-columns:1fr auto;align-items:center;padding:11px 14px;cursor:pointer;gap:8px;transition:background 0.15s}
-.ge-header:hover{background:#f0f7f4}
-.ge-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.ge-id{font-size:12px;font-weight:700;color:#27500A;background:#E2EFDA;padding:3px 10px;border-radius:20px}
-.ge-fecha{font-size:12px;color:#888}
-.ge-sep{font-size:12px;color:#ccc}
-.ge-info{font-size:12px;color:#666}
-.ge-total{font-size:12px;font-weight:700;color:#27500A}
-.ge-badge{font-size:11px;color:#888;background:#f0f0f0;padding:1px 7px;border-radius:10px}
-.ge-chevron{font-size:16px;color:#aaa;transition:transform 0.2s}
-.ge-detalle{display:none;border-top:0.5px solid #e0ede4}
-.ge-detalle-inner{padding:12px 14px}
-.ge-table{width:100%;border-collapse:collapse;font-size:12px}
-.ge-table th{font-size:11px;color:#888;text-transform:uppercase;padding:4px 6px;text-align:left;border-bottom:0.5px solid #eee;font-weight:600}
-.ge-table th:not(:first-child){text-align:right}
-.ge-table td{padding:5px 6px;border-bottom:0.5px solid #f5f5f5;color:#333}
-.ge-table td:not(:first-child){text-align:right}
-.ge-table tr:last-child td{border-bottom:none}
-.ge-table .cant{color:#888}
-.ge-table .neto{color:#888}
-.ge-table .civa{font-weight:600;color:#1a3d06}
-.ge-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:0.5px solid #eee}
-.btn-edit-guia{background:#fff;border:1px solid #b5d4f4;color:#0C447C;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-right:6px}
-.btn-edit-guia:hover{background:#E6F1FB}
-.ge-totales{display:flex;gap:16px;font-size:12px}
 .empty-guias{text-align:center;padding:30px;color:#aaa;font-size:13px}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:none;align-items:center;justify-content:center}
-.modal-bg.show{display:flex}
-.modal-edit{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:700px;max-height:90vh;overflow-y:auto;margin:16px}
-.modal-edit h3{font-size:16px;font-weight:700;margin-bottom:4px;color:#1a6b52}
-.edit-items-header{display:grid;grid-template-columns:1fr 80px 110px 38px;gap:8px;font-size:11px;color:#999;text-transform:uppercase;font-weight:700;padding:0 0 6px;border-bottom:1px solid #eee;margin:14px 0 8px}
-.edit-item-row{display:grid;grid-template-columns:1fr 80px 110px 38px;gap:8px;margin-bottom:8px;align-items:center}
-.edit-item-row input{padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%}
 .btn-del-guia{background:#fff;border:1px solid #fcc;color:#c00;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
 .btn-del-guia:hover{background:#FCEBEB}
 .info-box{background:#E2EFDA;border:1px solid #a3d0a8;border-radius:7px;padding:10px 14px;font-size:13px;color:#27500A;margin-bottom:12px}
@@ -163,100 +130,23 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 
 </div>
 
-<!-- MODAL EDITAR GUÍA -->
-<div class="modal-bg" id="modal-editar-guia" style="display:none">
-  <div class="modal-edit">
-    <h3>✏️ Editar guía de entrada</h3>
-    <p style="font-size:12px;color:#888;margin-bottom:14px">Los cambios ajustarán el stock automáticamente</p>
-    <input type="hidden" id="edit-guia-idx">
-    <div class="form-row">
-      <div class="form-group">
-        <label>Responsable</label>
-        <input type="text" id="edit-responsable">
-      </div>
-      <div class="form-group">
-        <label>Proveedor</label>
-        <input type="text" id="edit-proveedor">
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Fecha</label>
-        <input type="date" id="edit-fecha">
-      </div>
-      <div class="form-group">
-        <label>N° Factura / Observaciones</label>
-        <input type="text" id="edit-obs">
-      </div>
-    </div>
-    <div class="edit-items-header">
-      <span>Producto</span><span>Cantidad</span><span>Precio neto</span><span></span>
-    </div>
-    <div id="edit-items-container"></div>
-    <button class="btn-add" onclick="addFilaEditar()">+ Agregar producto</button>
-    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
-      <button class="btn-out" onclick="cerrarModalEditar()">Cancelar</button>
-      <button class="btn-entrada" onclick="guardarEdicion()">💾 Guardar cambios</button>
-    </div>
-    <div id="edit-status" style="font-size:12px;color:#888;margin-top:8px;text-align:center"></div>
-  </div>
-</div>
-
 <script>
-// Productos cargados dinámicamente desde BD en PRODUCTOS_BD
+const PRODUCTOS_LISTA = ["Confort Chico","Confort Industrial 4x500","Nova Industrial 2x250","Bolsa Basura 50x70","Bolsa Basura 70x90","Bolsa Basura 80x110","Bolsa Basura 120x130","Cloro","Cloro Gel","Limpia Piso","Crema Cif","Lavalosa","Limpia Vidrio","Lustra-Mueble","Jabon Liquido Bidon","Desodorante Ambiental","Lysoform","Toalla Desinfectante","Alcohol Liquido","Alcohol Gel","Esponja","Paño Multiuso 3x1","Paño Chico Microfibra","Trapero Microfibra C/Ojal","Mopa Algodón (Chas)","Mopa Seca (Avion)","Disco Pulidores Rojo","Cera Sachet","Cera Liquida Roja","Cera Liquida Incolora","Liquido Piso Flotante","Escobillon","Escobillon Barra Agua","Virutilla Piso","Palas","Plumeros","Guantes - S/7","Guantes - M/8","Guantes L/9","Guantes G/10","Atomizador Plasticos"];
 
 let productosMap = {};
-
-let PRODUCTOS_BD = [];
 
 async function cargarProductos(){
   const r = await fetch('/api/productos');
   const prods = await r.json();
-  PRODUCTOS_BD = prods;
   productosMap = {};
   prods.forEach(p=>{ productosMap[p.nombre] = {id: p.id, unidad: p.unidad, stock: p.stock_actual}; });
 }
 
 function crearSelectProducto(val=''){
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:relative;width:100%';
-
-  const inp = document.createElement('input');
-  inp.type='text'; inp.placeholder='Buscar producto...';
-  inp.value = val||'';
-  inp.autocomplete='off';
-  inp.style.cssText='width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px';
-
-  const dd = document.createElement('div');
-  dd.style.cssText='display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 7px 7px;max-height:200px;overflow-y:auto;z-index:500;box-shadow:0 4px 12px rgba(0,0,0,0.1)';
-
-  inp.addEventListener('input', ()=>{
-    const q = inp.value.toLowerCase().trim();
-    if(!q){ dd.style.display='none'; return; }
-    const matches = PRODUCTOS_BD.filter(p=>p.nombre.toLowerCase().includes(q));
-    dd.innerHTML='';
-    if(!matches.length){ dd.style.display='none'; return; }
-    matches.slice(0,10).forEach(p=>{
-      const item = document.createElement('div');
-      item.style.cssText='padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between';
-      item.innerHTML=`<span>${p.nombre}</span><span style="font-size:11px;color:#888">${p.stock_actual} ${p.unidad}</span>`;
-      item.addEventListener('mouseover',()=>item.style.background='#f0f7f4');
-      item.addEventListener('mouseout', ()=>item.style.background='');
-      item.addEventListener('mousedown',(e)=>{
-        e.preventDefault();
-        inp.value=p.nombre;
-        dd.style.display='none';
-      });
-      dd.appendChild(item);
-    });
-    dd.style.display='block';
-  });
-  dd.addEventListener('mousedown', e=>e.preventDefault());
-  inp.addEventListener('blur', ()=>setTimeout(()=>dd.style.display='none',150));
-
-  wrap.appendChild(inp);
-  wrap.appendChild(dd);
-  return wrap;
+  const sel = document.createElement('select');
+  sel.innerHTML = '<option value="">— Seleccionar producto —</option>' +
+    PRODUCTOS_LISTA.map(p=>`<option value="${p}"${p===val?' selected':''}>${p}</option>`).join('');
+  return sel;
 }
 
 function addFila(producto='', cantidad='', precio=''){
@@ -290,7 +180,7 @@ function addFila(producto='', cantidad='', precio=''){
   btn.className='btn-rm'; btn.textContent='×';
   btn.onclick=()=>{
     if(container.children.length>1){ row.remove(); actualizarTotalGeneral(); }
-    else { sel.value=''; inpCant.value=''; inpPrecio.value=''; actualizarTotal(); }
+    else { const inp=row.querySelector('input[type=text]'); if(inp) inp.value=''; inpCant.value=''; inpPrecio.value=''; actualizarTotal(); }
   };
 
   row.appendChild(sel); row.appendChild(inpCant); row.appendChild(inpPrecio);
@@ -304,9 +194,9 @@ function addFila(producto='', cantidad='', precio=''){
 function actualizarTotalGeneral(){
   let total = 0;
   document.querySelectorAll('#items-container .item-row').forEach(row=>{
-    const inputs = row.querySelectorAll('input');
-    const c = parseInt(inputs[0].value)||0;
-    const p = parseInt(inputs[1].value)||0;
+    const numInps = row.querySelectorAll('input[type=number]');
+    const c = parseInt(numInps[0]?.value)||0;
+    const p = parseInt(numInps[1]?.value)||0;
     total += c*p;
   });
   const el = document.getElementById('total-general');
@@ -333,10 +223,10 @@ async function emitirGuia(){
   const rows = document.querySelectorAll('#items-container .item-row');
   const items = [];
   rows.forEach(row=>{
-    const nombre   = (row.querySelector('input[type=text]')?.value||'').trim();
-    const numInps  = row.querySelectorAll('input[type=number]');
-    const cantidad = parseInt(numInps[0]?.value)||0;
-    const precio   = parseInt(numInps[1]?.value)||0;
+    const nombre   = row.querySelector('select').value;
+    const inputs   = row.querySelectorAll('input');
+    const cantidad = parseInt(inputs[0].value)||0;
+    const precio   = parseInt(inputs[1].value)||0;
     if(nombre && cantidad>0) items.push({nombre, cantidad, precio});
   });
   if(!items.length){ alert('Agrega al menos un producto con cantidad válida'); return; }
@@ -348,7 +238,7 @@ async function emitirGuia(){
   const errores = [];
   items.forEach(it=>{
     if(!productosMap[it.nombre])
-      errores.push(`"${it.nombre}" no está en inventario — agrégalo desde Inventario`);
+      errores.push(`"${it.nombre}" no está registrado en inventario — agrégalo primero desde Inventario`);
   });
   if(errores.length){
     alert('⚠️ Problemas encontrados:\n\n' + errores.join('\n'));
@@ -389,72 +279,6 @@ async function emitirGuia(){
   renderGuias();
 }
 
-function cerrarModalEditar(){
-  document.getElementById('modal-editar-guia').classList.remove('show');
-}
-
-function addFilaEditar(prod='', cant='', precio=''){
-  const c = document.getElementById('edit-items-container');
-  const row = document.createElement('div');
-  row.className = 'edit-item-row';
-  row.style.position = 'relative';
-
-  // Wrap con dropdown
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:relative';
-
-  const inpProd = document.createElement('input');
-  inpProd.type='text'; inpProd.placeholder='Buscar producto...'; inpProd.value=prod;
-  inpProd.autocomplete='off';
-  inpProd.style.cssText='width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px';
-
-  const dd = document.createElement('div');
-  dd.style.cssText='display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 7px 7px;max-height:180px;overflow-y:auto;z-index:500;box-shadow:0 4px 12px rgba(0,0,0,0.1)';
-
-  inpProd.addEventListener('input', ()=>{
-    const q = inpProd.value.toLowerCase().trim();
-    if(!q){ dd.style.display='none'; return; }
-    const matches = PRODUCTOS_BD.filter(p=>p.nombre.toLowerCase().includes(q));
-    dd.innerHTML='';
-    matches.slice(0,8).forEach(p=>{
-      const item = document.createElement('div');
-      item.style.cssText='padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between';
-      item.innerHTML=`<span>${p.nombre}</span><span style="font-size:11px;color:#888">${p.stock_actual} ${p.unidad}</span>`;
-      item.addEventListener('mouseover',()=>item.style.background='#f0f7f4');
-      item.addEventListener('mouseout', ()=>item.style.background='');
-      item.addEventListener('mousedown',(e)=>{
-        e.preventDefault();
-        inpProd.value=p.nombre;
-        dd.style.display='none';
-        inpCant.focus();
-      });
-      dd.appendChild(item);
-    });
-    dd.style.display = dd.children.length ? 'block' : 'none';
-  });
-  inpProd.addEventListener('blur', ()=>setTimeout(()=>dd.style.display='none',150));
-  dd.addEventListener('mousedown', e=>e.preventDefault());
-
-  wrap.appendChild(inpProd);
-  wrap.appendChild(dd);
-
-  const inpCant = document.createElement('input');
-  inpCant.type='number'; inpCant.min='1'; inpCant.placeholder='Cant.'; inpCant.value=cant||'';
-  inpCant.style.cssText='padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%';
-
-  const inpPrecio = document.createElement('input');
-  inpPrecio.type='number'; inpPrecio.min='0'; inpPrecio.placeholder='$ neto'; inpPrecio.value=precio||'';
-  inpPrecio.style.cssText='padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%;text-align:right';
-
-  const btn = document.createElement('button');
-  btn.className='btn-rm'; btn.textContent='×';
-  btn.onclick=()=>{ if(c.children.length>1) row.remove(); };
-
-  row.appendChild(wrap); row.appendChild(inpCant); row.appendChild(inpPrecio); row.appendChild(btn);
-  c.appendChild(row);
-}
-
-
 function renderGuias(){
   const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
   const container = document.getElementById('guias-lista');
@@ -463,67 +287,26 @@ function renderGuias(){
     container.innerHTML='<div class="empty-guias">No hay guías de entrada registradas aún</div>';
     return;
   }
-  container.innerHTML = guias.map((g,idx)=>{
-    const neto  = g.items.reduce((s,it)=>(s+(it.cantidad*(it.precio||0))),0);
-    const iva   = Math.round(neto*0.19);
-    const total = g.total || (neto+iva);
-    const fmt   = v=>'$'+v.toLocaleString('es-CL');
-    const rows  = g.items.map(it=>{
-      const n = it.cantidad*(it.precio||0);
-      const c = Math.round(n*1.19);
-      return `<tr>
-        <td>${it.nombre}</td>
-        <td class="cant">×${it.cantidad}</td>
-        <td class="neto">${it.precio>0?fmt(it.precio):'—'}</td>
-        <td class="neto">${n>0?fmt(n):'—'}</td>
-        <td class="civa">${c>0?fmt(c):'—'}</td>
-      </tr>`;
-    }).join('');
-    return `<div class="ge-card">
-      <div class="ge-header" onclick="toggleGE(this)">
-        <div class="ge-meta">
-          <span class="ge-id">${g.id}</span>
-          <span class="ge-fecha">${g.fecha}</span>
-          <span class="ge-sep">·</span>
-          <span class="ge-info">${g.responsable}</span>
-          ${g.proveedor?`<span class="ge-sep">·</span><span class="ge-info">${g.proveedor}</span>`:''}
-          ${g.obs?`<span class="ge-sep">·</span><span class="ge-info" style="color:#999;font-style:italic">${g.obs}</span>`:''}
-          <span class="ge-sep">·</span>
-          <span class="ge-total">${fmt(total)}</span>
-          <span class="ge-badge">${g.items.length} producto${g.items.length>1?'s':''}</span>
+  container.innerHTML = guias.map((g,idx)=>`
+    <div class="guia-item">
+      <div class="guia-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="guia-id">${g.id}</span>
+          <span style="font-size:12px;color:#888">${g.fecha}</span>
         </div>
-        <i class="ge-chevron">⌄</i>
+        <button class="btn-del-guia" onclick="eliminarGuia(${idx})">🗑️ Eliminar</button>
       </div>
-      <div class="ge-detalle">
-        <div class="ge-detalle-inner">
-          <table class="ge-table">
-            <thead><tr><th>Producto</th><th>Cant.</th><th>P. Unit neto</th><th>Total neto</th><th>Total c/IVA</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-          <div class="ge-footer">
-            <div style="display:flex;gap:6px">
-              <button class="btn-edit-guia" onclick="event.stopPropagation();abrirEditarGuia(${idx})">✏️ Editar guía</button>
-              <button class="btn-del-guia" onclick="event.stopPropagation();eliminarGuia(${idx})">🗑️ Eliminar guía</button>
-            </div>
-            <div class="ge-totales">
-              <span style="color:#888">Neto: ${fmt(neto)}</span>
-              <span style="color:#888">IVA: ${fmt(iva)}</span>
-              <span style="font-weight:700;color:#27500A">Total c/IVA: ${fmt(total)}</span>
-            </div>
-          </div>
-        </div>
+      <div class="guia-meta">
+        <strong>${g.responsable}</strong>
+        ${g.proveedor ? ` · Proveedor: <strong>${g.proveedor}</strong>` : ''}
+        ${g.obs ? ` · <em style="color:#888">${g.obs}</em>` : ''}
       </div>
-    </div>`;
-  }).join('');
-}
-
-function toggleGE(header){
-  const detalle = header.nextElementSibling;
-  const icono   = header.querySelector('.ge-chevron');
-  const abierto = detalle.style.display === 'block';
-  detalle.style.display = abierto ? 'none' : 'block';
-  icono.style.transform = abierto ? '' : 'rotate(180deg)';
-  icono.textContent     = abierto ? '⌄' : '⌃';
+      <div class="chips">
+        ${g.items.map(it=>`<span class="chip">📥 ${it.nombre} ×${it.cantidad}${it.precio>0?' · $'+it.precio.toLocaleString('es-CL')+'c/u':''}</span>`).join('')}
+      </div>
+      ${g.total>0?`<div style="margin-top:8px;text-align:right;font-size:13px;font-weight:700;color:#27500A">Total: $${g.total.toLocaleString('es-CL')}</div>`:''}
+    </div>
+  `).join('');
 }
 
 function eliminarGuia(idx){
@@ -534,181 +317,11 @@ function eliminarGuia(idx){
   renderGuias();
 }
 
-/* ── EDITAR GUÍA ─────────────────────────────────────────── */
-function abrirEditarGuia(idx){
-  const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
-  const g = guias[idx];
-  if(!g){ alert('Error: guía no encontrada'); return; }
-
-  document.getElementById('edit-guia-idx').value    = idx;
-  document.getElementById('edit-responsable').value = g.responsable||'';
-  document.getElementById('edit-proveedor').value   = g.proveedor||'';
-  document.getElementById('edit-obs').value         = g.obs||'';
-
-  const partes = (g.fecha||'').split('-');
-  if(partes.length===3 && partes[2].length===4){
-    document.getElementById('edit-fecha').value = `${partes[2]}-${partes[1]}-${partes[0]}`;
-  } else {
-    document.getElementById('edit-fecha').value = g.fecha||'';
-  }
-
-  const c = document.getElementById('edit-items-container');
-  c.innerHTML = '';
-  g.items.forEach(it => addFilaEditar(it.nombre, it.cantidad, it.precio||''));
-
-  document.getElementById('edit-status').textContent = '';
-  const modal = document.getElementById('modal-editar-guia');
-  modal.style.display = 'flex';
-}
-
-function cerrarModalEditar(){
-  document.getElementById('modal-editar-guia').style.display = 'none';
-}
-
-function addFilaEditar(prod='', cant='', precio=''){
-  const c = document.getElementById('edit-items-container');
-  const row = document.createElement('div');
-  row.className = 'edit-item-row';
-
-  // Wrap con dropdown
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:relative';
-
-  const inpProd = document.createElement('input');
-  inpProd.type = 'text';
-  inpProd.placeholder = 'Buscar producto...';
-  inpProd.value = prod;
-  inpProd.autocomplete = 'off';
-  inpProd.style.cssText = 'width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px';
-
-  const dd = document.createElement('div');
-  dd.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 7px 7px;max-height:180px;overflow-y:auto;z-index:500;box-shadow:0 4px 12px rgba(0,0,0,0.1)';
-
-  inpProd.addEventListener('input', ()=>{
-    const q = inpProd.value.toLowerCase().trim();
-    if(!q){ dd.style.display='none'; return; }
-    const matches = PRODUCTOS_BD.filter(p=>p.nombre.toLowerCase().includes(q));
-    dd.innerHTML = '';
-    if(!matches.length){ dd.style.display='none'; return; }
-    matches.slice(0,8).forEach(p=>{
-      const item = document.createElement('div');
-      item.style.cssText = 'padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between';
-      item.innerHTML = `<span>${p.nombre}</span><span style="font-size:11px;color:#888">${p.stock_actual} ${p.unidad}</span>`;
-      item.addEventListener('mouseover', ()=>item.style.background='#f0f7f4');
-      item.addEventListener('mouseout',  ()=>item.style.background='');
-      item.addEventListener('mousedown', (e)=>{
-        e.preventDefault();
-        inpProd.value = p.nombre;
-        dd.style.display = 'none';
-        inpCant.focus();
-      });
-      dd.appendChild(item);
-    });
-    dd.style.display = 'block';
-  });
-  dd.addEventListener('mousedown', e=>e.preventDefault());
-  inpProd.addEventListener('blur', ()=>setTimeout(()=>dd.style.display='none', 150));
-
-  wrap.appendChild(inpProd);
-  wrap.appendChild(dd);
-
-  const inpCant = document.createElement('input');
-  inpCant.type='number'; inpCant.min='1';
-  inpCant.placeholder='Cant.'; inpCant.value=cant||'';
-  inpCant.style.cssText='padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%';
-
-  const inpPrecio = document.createElement('input');
-  inpPrecio.type='number'; inpPrecio.min='0';
-  inpPrecio.placeholder='$ neto'; inpPrecio.value=precio||'';
-  inpPrecio.style.cssText='padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%;text-align:right';
-
-  const btn = document.createElement('button');
-  btn.className='btn-rm'; btn.textContent='×';
-  btn.onclick = ()=>{ if(c.children.length>1) row.remove(); };
-
-  row.appendChild(wrap);
-  row.appendChild(inpCant);
-  row.appendChild(inpPrecio);
-  row.appendChild(btn);
-  c.appendChild(row);
-}
-
-async function guardarEdicion(){
-  const idx = parseInt(document.getElementById('edit-guia-idx').value);
-  const guias = JSON.parse(localStorage.getItem('bodega_guias_entrada')||'[]');
-  const gOld = guias[idx];
-  if(!gOld) return;
-
-  const rows = document.getElementById('edit-items-container').querySelectorAll('.edit-item-row');
-  const itemsNew = [];
-  rows.forEach(row=>{
-    const nombre   = (row.querySelector('input[type=text]')?.value||'').trim();
-    const numInps  = row.querySelectorAll('input[type=number]');
-    const cantidad = parseInt(numInps[0]?.value)||0;
-    const precio   = parseInt(numInps[1]?.value)||0;
-    if(nombre && cantidad>0) itemsNew.push({nombre, cantidad, precio});
-  });
-  if(!itemsNew.length){ alert('Agrega al menos un producto'); return; }
-
-  const status = document.getElementById('edit-status');
-  status.textContent = '⏳ Ajustando stock...';
-
-  const mapOld = {};
-  gOld.items.forEach(it=>{ mapOld[it.nombre] = (mapOld[it.nombre]||0) + it.cantidad; });
-  const mapNew = {};
-  itemsNew.forEach(it=>{ mapNew[it.nombre] = (mapNew[it.nombre]||0) + it.cantidad; });
-
-  await cargarProductos();
-
-  const todosProds = new Set([...Object.keys(mapOld), ...Object.keys(mapNew)]);
-  let errores = 0;
-
-  for(const nombre of todosProds){
-    const cantOld = mapOld[nombre]||0;
-    const cantNew = mapNew[nombre]||0;
-    const diff = cantNew - cantOld;
-    if(diff === 0) continue;
-    const prod = productosMap[nombre];
-    if(!prod){ errores++; continue; }
-    const r = await fetch('/api/movimientos',{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        producto_id: prod.id,
-        tipo: diff>0 ? 'entrada' : 'salida',
-        cantidad: Math.abs(diff),
-        edificio:'',
-        observacion:`[Edición guía ${gOld.id}]`,
-        fecha: new Date().toLocaleDateString('es-CL').replace(/\//g,'-')
-      })
-    });
-    const d = await r.json();
-    if(d.error) errores++;
-  }
-
-  const fechaInput = document.getElementById('edit-fecha').value;
-  const partes = fechaInput.split('-');
-  const fechaFmt = partes.length===3 ? `${partes[2]}-${partes[1]}-${partes[0]}` : fechaInput;
-  const totalNuevo = Math.round(itemsNew.reduce((s,it)=>s+(it.cantidad*(it.precio||0)*1.19),0));
-
-  guias[idx] = {
-    ...gOld,
-    responsable: document.getElementById('edit-responsable').value.trim(),
-    proveedor:   document.getElementById('edit-proveedor').value.trim(),
-    obs:         document.getElementById('edit-obs').value.trim(),
-    fecha:       fechaFmt,
-    items:       itemsNew,
-    total:       totalNuevo
-  };
-  localStorage.setItem('bodega_guias_entrada', JSON.stringify(guias));
-
-  status.textContent = errores===0 ? '✅ Cambios guardados' : `⚠️ Guardado con ${errores} advertencia(s)`;
-  setTimeout(()=>{ cerrarModalEditar(); renderGuias(); }, 1200);
-}
-/* ─────────────────────────────────────────────────────────── */
-
 // Inicializar
 document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
-cargarProductos().then(()=>{ limpiarFormulario(); renderGuias(); });
+limpiarFormulario();
+cargarProductos();
+renderGuias();
 </script>
 </body>
 </html>
