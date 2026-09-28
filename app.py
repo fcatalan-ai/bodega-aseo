@@ -803,6 +803,7 @@ def movimientos_page():
         user=session['user'], rol=session['rol'],
         categorias=CATEGORIAS, edificios=EDIFICIOS)
 
+
 @app.route('/api/movimientos/<int:mid>', methods=['PUT'])
 @login_required
 def editar_movimiento(mid):
