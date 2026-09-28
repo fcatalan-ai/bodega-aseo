@@ -75,11 +75,11 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
   <h1>🧴 Bodega de Aseo — Guía de Salida</h1>
   <div class="topbar-links">
     <a href="/">📦 Inventario</a>
-    <a href="/dashboard">📊 Dashboard</a>
+    {% if rol == 'admin' %}<a href="/dashboard">📊 Dashboard</a>{% endif %}
     <a href="/movimientos">📋 Movimientos</a>
-    <a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>
+    {% if rol == 'admin' %}<a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>{% endif %}
     <a href="/guia" class="active">📄 Guía Salida</a>
-    <a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>
+    {% if rol in ('admin','operador') %}<a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>{% endif %}
     <a href="/logout">Salir</a>
   </div>
 </div>
@@ -168,6 +168,7 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 </div>
 
 <script>
+const ROL_USUARIO = "{{ rol }}";
 /* ─── Stock ─── */
 let stockMap = {}, PRODUCTOS_BD = [];
 
@@ -486,7 +487,7 @@ function renderGuias(){
           <span class="guia-id">${g.id}</span>
           <span style="font-size:12px;color:#888">${g.fecha}</span>
         </div>
-        <button class="btn-del-guia" onclick="eliminarGuia(${idx})">🗑️ Eliminar</button>
+        ${ROL_USUARIO==='admin'?`<button class="btn-del-guia" onclick="eliminarGuia(${idx})">🗑️ Eliminar</button>`:''}
       </div>
       <div class="guia-meta">
         <strong>${g.responsable}</strong> → <strong>${g.edificio}</strong>
