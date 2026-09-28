@@ -49,6 +49,25 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 .btn-del-guia:hover{background:#FCEBEB}
 /* Alerta stock */
 .stock-warn{background:#FCEBEB;border:1px solid #f5a0a0;border-radius:7px;padding:10px 14px;font-size:13px;color:#791F1F;margin-bottom:12px;display:none}
+/* Canvas firma */
+.firma-wrap{margin-top:16px;margin-bottom:8px}
+.firma-label{font-size:12px;color:#666;font-weight:600;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.canvas-firma{display:block;width:100%;border:1.5px solid #0D4F3C;border-radius:8px;background:#fff;touch-action:none;cursor:crosshair}
+.btn-clear-firma{background:#fff;border:1px solid #ddd;color:#888;padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer}
+.btn-clear-firma:hover{background:#f5f5f5;color:#333}
+.firma-hint{font-size:11px;color:#aaa;margin-top:4px;text-align:center}
+/* Panel PDF resultado */
+.pdf-result{display:none;background:#E2EFDA;border:1.5px solid #27500A;border-radius:10px;padding:18px;margin-top:14px;text-align:center}
+.pdf-result.show{display:block}
+.pdf-result .pdf-id{font-size:18px;font-weight:800;color:#0D4F3C;margin-bottom:4px}
+.pdf-result .pdf-sub{font-size:13px;color:#555;margin-bottom:14px}
+.pdf-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn-pdf{background:#0D4F3C;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn-pdf:hover{background:#1a6b52}
+.btn-wa{background:#25D366;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn-wa:hover{background:#1eb857}
+.btn-mail{background:#555;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn-mail:hover{background:#333}
 </style>
 </head>
 <body>
@@ -110,9 +129,30 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
       <button class="btn-add" onclick="addFila()">+ Agregar fila</button>
     </div>
 
+    <!-- FIRMA DIGITAL -->
+    <div class="firma-wrap">
+      <div class="firma-label">
+        <span>✍️ Firma del responsable</span>
+        <button class="btn-clear-firma" onclick="limpiarFirma()">✕ Limpiar</button>
+      </div>
+      <canvas id="canvas-firma" class="canvas-firma" height="140"></canvas>
+      <div class="firma-hint">Firme con el dedo o el mouse</div>
+    </div>
+
     <div class="btn-row">
-      <button class="btn-green" onclick="emitirGuia()">📄 Emitir Guía</button>
+      <button class="btn-green" onclick="emitirGuia()" id="btn-emitir">📄 Emitir Guía + PDF</button>
       <button class="btn-out" onclick="limpiarFormulario()">↺ Limpiar</button>
+    </div>
+
+    <!-- RESULTADO PDF -->
+    <div class="pdf-result" id="pdf-result">
+      <div class="pdf-id" id="pdf-guia-id">G-—</div>
+      <div class="pdf-sub" id="pdf-guia-sub">Guía emitida correctamente</div>
+      <div class="pdf-btns">
+        <button class="btn-pdf" id="btn-descargar-pdf" onclick="descargarPDF()">⬇️ Descargar PDF</button>
+        <a class="btn-mail" id="btn-mail" href="#" target="_blank">📧 Enviar por correo</a>
+        <a class="btn-wa" id="btn-wa" href="#" target="_blank">💬 Compartir WhatsApp</a>
+      </div>
     </div>
   </div>
 
@@ -128,33 +168,26 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 </div>
 
 <script>
-const PRODUCTOS_LISTA = ["Confort Chico","Confort Industrial 4x500","Nova Industrial 2x250","Bolsa Basura 50x70","Bolsa Basura 70x90","Bolsa Basura 80x110","Bolsa Basura 120x130","Cloro","Cloro Gel","Limpia Piso","Crema Cif","Lavalosa","Limpia Vidrio","Lustra-Mueble","Jabon Liquido Bidon","Desodorante Ambiental","Lysoform","Toalla Desinfectante","Alcohol Liquido","Alcohol Gel","Esponja","Paño Multiuso 3x1","Paño Chico Microfibra","Trapero Microfibra C/Ojal","Mopa Algodón (Chas)","Mopa Seca (Avion)","Disco Pulidores Rojo","Cera Sachet","Cera Liquida Roja","Cera Liquida Incolora","Liquido Piso Flotante","Escobillon","Escobillon Barra Agua","Virutilla Piso","Palas","Plumeros","Guantes - S/7","Guantes - M/8","Guantes L/9","Guantes G/10","Atomizador Plasticos"];
-
-let stockMap = {}; // nombre -> stock_actual
-
-let PRODUCTOS_BD = [];
+/* ─── Stock ─── */
+let stockMap = {}, PRODUCTOS_BD = [];
 
 async function cargarStock(){
   const r = await fetch('/api/productos');
-  const prods = await r.json();
-  PRODUCTOS_BD = prods;
+  PRODUCTOS_BD = await r.json();
   stockMap = {};
-  prods.forEach(p=>{ stockMap[p.nombre] = {stock: p.stock_actual, unidad: p.unidad, id: p.id}; });
+  PRODUCTOS_BD.forEach(p=>{ stockMap[p.nombre] = {stock: p.stock_actual, unidad: p.unidad, id: p.id}; });
 }
 
+/* ─── Autocomplete de producto ─── */
 function crearSelectProducto(val=''){
   const wrap = document.createElement('div');
   wrap.style.cssText = 'position:relative;width:100%';
-
   const inp = document.createElement('input');
   inp.type='text'; inp.placeholder='Buscar producto...';
-  inp.value = val||'';
-  inp.autocomplete = 'off';
+  inp.value = val||''; inp.autocomplete = 'off';
   inp.style.cssText = 'width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px';
-
   const dd = document.createElement('div');
   dd.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 7px 7px;max-height:180px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.1)';
-
   inp.oninput = ()=>{
     const q = inp.value.toLowerCase().trim();
     if(!q){ dd.style.display='none'; return; }
@@ -168,77 +201,39 @@ function crearSelectProducto(val=''){
       item.innerHTML = `<span>${p.nombre}</span><span style="font-size:11px;color:${bajo?'#c00':'#888'};font-weight:${bajo?'700':'400'}">${p.stock_actual} ${p.unidad}${bajo?' ⚠️':''}</span>`;
       item.addEventListener('mouseover', ()=>item.style.background='#f0f7f4');
       item.addEventListener('mouseout',  ()=>item.style.background='');
-      item.addEventListener('mousedown', (e)=>{
-        e.preventDefault();
-        inp.value = p.nombre;
-        dd.style.display = 'none';
-        dd.innerHTML = '';
-        inp.blur();
-      });
+      item.addEventListener('mousedown', (e)=>{ e.preventDefault(); inp.value = p.nombre; dd.style.display='none'; inp.blur(); });
       dd.appendChild(item);
     });
     dd.style.display='block';
   };
-  inp.addEventListener('blur', ()=>{ setTimeout(()=>{ dd.style.display='none'; dd.querySelectorAll('div').forEach(i=>i.style.background=''); }, 150); });
+  inp.addEventListener('blur', ()=>{ setTimeout(()=>{ dd.style.display='none'; }, 150); });
   inp.onfocus = ()=>{ if(inp.value) inp.oninput(); };
-
-  // Navegación con teclado
-  let idxSeleccionado = -1;
+  let idxSel = -1;
   inp.addEventListener('keydown', (e)=>{
     const items = [...dd.querySelectorAll('div')];
     if(!items.length || dd.style.display==='none') return;
-    if(e.key==='ArrowDown'){
-      e.preventDefault();
-      idxSeleccionado = Math.min(idxSeleccionado+1, items.length-1);
-    } else if(e.key==='ArrowUp'){
-      e.preventDefault();
-      idxSeleccionado = Math.max(idxSeleccionado-1, 0);
-    } else if(e.key==='Enter'){
-      e.preventDefault();
-      if(idxSeleccionado>=0 && items[idxSeleccionado]){
-        items[idxSeleccionado].dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
-      }
-      return;
-    } else if(e.key==='Escape'){
-      dd.style.display='none'; idxSeleccionado=-1; return;
-    } else {
-      idxSeleccionado = -1; return;
-    }
-    items.forEach((it,i)=>{
-      it.style.background = i===idxSeleccionado ? '#c8e6d0' : '';
-    });
+    if(e.key==='ArrowDown'){ e.preventDefault(); idxSel=Math.min(idxSel+1,items.length-1); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); idxSel=Math.max(idxSel-1,0); }
+    else if(e.key==='Enter'){ e.preventDefault(); if(idxSel>=0) items[idxSel].dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); return; }
+    else if(e.key==='Escape'){ dd.style.display='none'; idxSel=-1; return; }
+    else { idxSel=-1; return; }
+    items.forEach((it,i)=>{ it.style.background = i===idxSel ? '#c8e6d0' : ''; });
   });
-
-
   wrap.appendChild(inp); wrap.appendChild(dd);
   return wrap;
-}
-
-function seleccionarProd(el, e){
-  e.preventDefault();
-  e.stopPropagation();
-  const wrap = el.closest('div[style*="position:relative"]');
-  const inp = wrap.querySelector('input');
-  const dd  = wrap.querySelector('div[style*="position:absolute"]');
-  inp.value = el.dataset.nombre;
-  dd.style.display='none';
-  inp.blur();
 }
 
 function addFila(producto='', cantidad=''){
   const container = document.getElementById('items-container');
   const row = document.createElement('div');
   row.className = 'item-row';
-
   const sel = crearSelectProducto(producto);
   const inp = document.createElement('input');
   inp.type='number'; inp.min='1'; inp.placeholder='Cant.'; inp.value=cantidad||'';
   inp.style.cssText='padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%';
-
   const btn = document.createElement('button');
   btn.className='btn-rm'; btn.textContent='×';
-  btn.onclick=()=>{ if(container.children.length>1) row.remove(); else { sel.value=''; inp.value=''; } };
-
+  btn.onclick=()=>{ if(container.children.length>1) row.remove(); else { inp.value=''; } };
   row.appendChild(sel); row.appendChild(inp); row.appendChild(btn);
   container.appendChild(row);
 }
@@ -250,9 +245,70 @@ function limpiarFormulario(){
   document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('items-container').innerHTML='';
   document.getElementById('stock-warn').style.display='none';
+  document.getElementById('pdf-result').classList.remove('show');
+  limpiarFirma();
   for(let i=0;i<5;i++) addFila();
 }
 
+/* ─── Canvas firma ─── */
+let _pdfB64 = null, _pdfNombre = null;
+
+(function initCanvas(){
+  const canvas = document.getElementById('canvas-firma');
+  const ctx = canvas.getContext('2d');
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+
+  function resize(){
+    const old = canvas.toDataURL();
+    canvas.width = canvas.offsetWidth;
+    // Restaurar contenido
+    const img = new Image();
+    img.onload = ()=>ctx.drawImage(img, 0, 0);
+    img.src = old;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function getPos(e){
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x:(t.clientX-r.left)*(canvas.width/r.width), y:(t.clientY-r.top)*(canvas.height/r.height) };
+  }
+
+  function startDraw(e){ e.preventDefault(); drawing=true; const p=getPos(e); lastX=p.x; lastY=p.y; }
+  function draw(e){
+    if(!drawing) return; e.preventDefault();
+    const p = getPos(e);
+    ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(p.x,p.y);
+    ctx.strokeStyle='#0D4F3C'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.stroke();
+    lastX=p.x; lastY=p.y;
+  }
+  function endDraw(){ drawing=false; }
+
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', endDraw);
+  canvas.addEventListener('mouseleave', endDraw);
+  canvas.addEventListener('touchstart', startDraw, {passive:false});
+  canvas.addEventListener('touchmove', draw, {passive:false});
+  canvas.addEventListener('touchend', endDraw);
+})();
+
+function limpiarFirma(){
+  const canvas = document.getElementById('canvas-firma');
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function firmaEstaVacia(){
+  const canvas = document.getElementById('canvas-firma');
+  const ctx = canvas.getContext('2d');
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  for(let i=3; i<data.length; i+=4){ if(data[i]>0) return false; }
+  return true;
+}
+
+/* ─── Emitir guía ─── */
 async function emitirGuia(){
   const responsable = document.getElementById('g-responsable').value.trim();
   const edificio    = document.getElementById('g-edificio').value.trim();
@@ -289,36 +345,132 @@ async function emitirGuia(){
   }
   document.getElementById('stock-warn').style.display='none';
 
-  // Registrar movimientos uno a uno
+  // Firma (opcional)
+  let firma_b64 = null;
+  if(!firmaEstaVacia()){
+    firma_b64 = document.getElementById('canvas-firma').toDataURL('image/png');
+  }
+
+  // Registrar movimientos
   const fechaFmt = fecha ? fecha.split('-').reverse().join('-') : new Date().toLocaleDateString('es-CL').replace(/\//g,'-');
-  let ok = true;
+  const btn = document.getElementById('btn-emitir');
+  btn.disabled = true; btn.textContent = '⏳ Registrando...';
+
   for(const it of items){
     const s = stockMap[it.nombre];
     const data = {
-      producto_id: s.id,
-      tipo: 'salida',
-      cantidad: it.cantidad,
-      edificio,
-      observacion: obs ? `[Guía] ${obs}` : '[Guía de salida]',
-      fecha: fechaFmt,
+      producto_id: s.id, tipo: 'salida', cantidad: it.cantidad,
+      edificio, observacion: obs ? `[Guía] ${obs}` : '[Guía de salida]', fecha: fechaFmt,
     };
     const r = await fetch('/api/movimientos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
     const d = await r.json();
-    if(d.error){ alert('Error al registrar "'+it.nombre+'": '+d.error); ok=false; break; }
+    if(d.error){ alert('Error al registrar "'+it.nombre+'": '+d.error); btn.disabled=false; btn.textContent='📄 Emitir Guía + PDF'; return; }
   }
-  if(!ok) return;
 
-  // Guardar guía en localStorage para historial visual
-  const guias = JSON.parse(localStorage.getItem('bodega_guias')||'[]');
-  const id = 'G-'+Date.now();
-  guias.unshift({id, fecha:fechaFmt, responsable, edificio, obs, items});
-  localStorage.setItem('bodega_guias', JSON.stringify(guias.slice(0,100)));
+  // Generar PDF
+  const guiaId = 'G-' + Date.now();
+  btn.textContent = '📄 Generando PDF...';
 
-  alert(`✅ Guía ${id} emitida correctamente.\n${items.length} producto(s) descontados del stock.`);
-  limpiarFormulario();
-  renderGuias();
+  try {
+    const r = await fetch('/api/guias/pdf', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        id: guiaId, responsable, edificio, fecha: fechaFmt, observacion: obs,
+        items: items.map(it=>({
+          nombre: it.nombre,
+          cantidad: it.cantidad,
+          unidad: (stockMap[it.nombre]?.unidad||'un'),
+        })),
+        firma_b64,
+      })
+    });
+
+    if(!r.ok){ throw new Error('HTTP '+r.status); }
+    const d = await r.json();
+
+    if(d.error){ throw new Error(d.error); }
+
+    // Guardar b64 para descarga posterior
+    _pdfB64 = d.pdf_b64;
+    _pdfNombre = d.nombre || (guiaId + '.pdf');
+
+    // Guardar en localStorage
+    const guias = JSON.parse(localStorage.getItem('bodega_guias')||'[]');
+    guias.unshift({id:guiaId, fecha:fechaFmt, responsable, edificio, obs, items});
+    localStorage.setItem('bodega_guias', JSON.stringify(guias.slice(0,100)));
+
+    // Mostrar resultado
+    mostrarResultadoPDF(guiaId, responsable, edificio, fechaFmt, items, obs);
+    limpiarFormulario();
+    renderGuias();
+
+  } catch(e){
+    // Si falla el PDF, igual guardamos la guía
+    const guias = JSON.parse(localStorage.getItem('bodega_guias')||'[]');
+    guias.unshift({id:guiaId, fecha:fechaFmt, responsable, edificio, obs, items});
+    localStorage.setItem('bodega_guias', JSON.stringify(guias.slice(0,100)));
+    alert('✅ Guía '+guiaId+' emitida.\n(No se pudo generar el PDF: '+e.message+')');
+    limpiarFormulario();
+    renderGuias();
+  }
+
+  btn.disabled = false; btn.textContent = '📄 Emitir Guía + PDF';
 }
 
+function mostrarResultadoPDF(guiaId, responsable, edificio, fecha, items, obs){
+  document.getElementById('pdf-guia-id').textContent = guiaId;
+  document.getElementById('pdf-guia-sub').textContent =
+    `${items.length} producto(s) · ${responsable} → ${edificio} · ${fecha}`;
+
+  // Construir texto WhatsApp
+  const lineas = items.map(it=>`• ${it.nombre}: ${it.cantidad} ${it.unidad||'un'}`).join('\n');
+  const waText = encodeURIComponent(
+    `*Guía de Salida Bodega Aseo — ${guiaId}*\n`+
+    `Colegio Centenario de Temuco\n\n`+
+    `📅 Fecha: ${fecha}\n`+
+    `👤 Responsable: ${responsable}\n`+
+    `🏢 Edificio: ${edificio}\n`+
+    (obs ? `📝 Obs: ${obs}\n` : '')+
+    `\n*Productos:*\n${lineas}`
+  );
+  document.getElementById('btn-wa').href = `https://wa.me/?text=${waText}`;
+
+  // Construir mailto
+  const mailSubject = encodeURIComponent(`Guía de Salida ${guiaId} — Bodega Aseo Colegio Centenario`);
+  const mailBody = encodeURIComponent(
+    `Guía de Salida — Bodega de Aseo\nColegio Centenario de Temuco\n\n`+
+    `ID: ${guiaId}\nFecha: ${fecha}\nResponsable: ${responsable}\nEdificio: ${edificio}\n`+
+    (obs ? `Observaciones: ${obs}\n` : '')+
+    `\nProductos retirados:\n${items.map(it=>`- ${it.nombre}: ${it.cantidad} ${it.unidad||'un'}`).join('\n')}`
+  );
+  document.getElementById('btn-mail').href = `mailto:?subject=${mailSubject}&body=${mailBody}`;
+
+  document.getElementById('pdf-result').classList.add('show');
+  document.getElementById('pdf-result').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function descargarPDF(){
+  if(!_pdfB64){ alert('No hay PDF disponible.'); return; }
+  const bytes = atob(_pdfB64);
+  const arr = new Uint8Array(bytes.length);
+  for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+  const blob = new Blob([arr], {type:'application/pdf'});
+  const url = URL.createObjectURL(blob);
+
+  // iOS: window.open; otros: link de descarga
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if(isIOS){
+    window.open(url, '_blank');
+  } else {
+    const a = document.createElement('a');
+    a.href = url; a.download = _pdfNombre || 'guia.pdf';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
+  }
+}
+
+/* ─── Historial local ─── */
 function renderGuias(){
   const guias = JSON.parse(localStorage.getItem('bodega_guias')||'[]');
   const container = document.getElementById('guias-lista');
@@ -355,7 +507,7 @@ function eliminarGuia(idx){
   renderGuias();
 }
 
-// Inicializar
+/* ─── Init ─── */
 document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
 cargarStock().then(()=>{
   limpiarFormulario();
