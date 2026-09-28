@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>{{ producto.nombre }} — Bodega Aseo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f0f4f8;min-height:100vh;color:#1a1a1a}
+.header{background:#0D4F3C;color:#fff;padding:14px 16px;text-align:center}
+.header h1{font-size:15px;opacity:.8;font-weight:400}
+.header h2{font-size:20px;font-weight:700;margin-top:2px}
+.header .badge-cat{display:inline-block;background:rgba(255,255,255,.15);border-radius:20px;padding:3px 12px;font-size:12px;margin-top:6px}
+.main{padding:14px;max-width:480px;margin:0 auto}
+.card{background:#fff;border-radius:12px;border:1px solid #e5e8ed;padding:18px;margin-bottom:14px}
+.stock-box{text-align:center;padding:16px 0 8px}
+.stock-num{font-size:52px;font-weight:800;color:#0D4F3C;line-height:1}
+.stock-num.low{color:#C00}
+.stock-num.zero{color:#C00}
+.stock-unit{font-size:14px;color:#888;margin-top:4px}
+.stock-minimo{font-size:12px;color:#aaa;margin-top:6px}
+.badge-ok{background:#E2EFDA;color:#27500A;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;margin-top:8px}
+.badge-low{background:#FCEBEB;color:#791F1F;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;margin-top:8px}
+.badge-zero{background:#C00;color:#fff;padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;margin-top:8px}
+.section-title{font-size:11px;font-weight:700;color:#0D4F3C;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #f0f0f0}
+.form-group{margin-bottom:12px}
+.form-group label{font-size:12px;color:#555;display:block;margin-bottom:4px;font-weight:600}
+.form-group input,.form-group select{width:100%;padding:11px 13px;border:1.5px solid #ddd;border-radius:9px;font-size:15px;background:#fafafa;transition:border-color .2s}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:#0D4F3C;background:#fff}
+.btn-salida{width:100%;background:#0D4F3C;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-top:4px;letter-spacing:.02em}
+.btn-salida:active{background:#0a3d2e}
+.btn-salida:disabled{background:#aaa;cursor:not-allowed}
+.pin-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* Historial */
+.mov-list{margin-top:4px}
+.mov-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:13px}
+.mov-item:last-child{border-bottom:none}
+.mov-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.dot-e{background:#27500A}
+.dot-s{background:#C00}
+.mov-info{flex:1}
+.mov-tipo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.tipo-e{color:#27500A}
+.tipo-s{color:#C00}
+.mov-detalle{color:#555;margin-top:1px}
+.mov-meta{color:#bbb;font-size:11px;margin-top:2px}
+/* Toast */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:12px 22px;border-radius:10px;font-size:14px;font-weight:600;z-index:999;display:none;max-width:90vw;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.toast.show{display:block;animation:fadein .3s}
+.toast.success{background:#0D4F3C}
+.toast.error{background:#C00}
+@keyframes fadein{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.result-box{display:none;background:#E2EFDA;border:1.5px solid #27500A;border-radius:10px;padding:16px;text-align:center;margin-top:14px}
+.result-box.show{display:block}
+.result-box .res-num{font-size:32px;font-weight:800;color:#0D4F3C}
+.result-box .res-txt{font-size:13px;color:#555;margin-top:4px}
+.footer{text-align:center;padding:16px;font-size:11px;color:#bbb}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🧴 Bodega de Aseo — Colegio Centenario</h1>
+  <h2>{{ producto.nombre }}</h2>
+  <span class="badge-cat">{{ producto.categoria }}</span>
+</div>
+
+<div class="main">
+
+  <!-- Stock actual -->
+  <div class="card">
+    <div class="stock-box">
+      {% set bajo = producto.stock_minimo > 0 and producto.stock_actual <= producto.stock_minimo %}
+      <div class="stock-num {% if producto.stock_actual == 0 %}zero{% elif bajo %}low{% endif %}" id="stock-num">
+        {{ producto.stock_actual }}
+      </div>
+      <div class="stock-unit">{{ producto.unidad }} disponibles</div>
+      {% if producto.stock_minimo > 0 %}
+        <div class="stock-minimo">Stock mínimo: {{ producto.stock_minimo }} {{ producto.unidad }}</div>
+      {% endif %}
+      {% if producto.stock_actual == 0 %}
+        <span class="badge-zero">🔴 AGOTADO</span>
+      {% elif bajo %}
+        <span class="badge-low">⚠️ Stock bajo</span>
+      {% else %}
+        <span class="badge-ok">✅ Disponible</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Formulario salida rápida -->
+  {% if producto.stock_actual > 0 %}
+  <div class="card">
+    <div class="section-title">📤 Registrar retiro</div>
+
+    <div class="form-group">
+      <label>Tu nombre *</label>
+      <input type="text" id="f-nombre" placeholder="Ej: Juan Pérez" autocomplete="name">
+    </div>
+
+    <div class="pin-row">
+      <div class="form-group">
+        <label>Edificio *</label>
+        <select id="f-edificio">
+          <option value="">— Seleccionar —</option>
+          {% for e in edificios %}<option>{{ e }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Cantidad *</label>
+        <input type="number" id="f-cantidad" min="1" max="{{ producto.stock_actual }}" placeholder="0" inputmode="numeric">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>PIN de bodega *</label>
+      <input type="password" id="f-pin" placeholder="••••" maxlength="8" inputmode="numeric">
+    </div>
+
+    <button class="btn-salida" onclick="registrarSalida()" id="btn-salida">
+      📤 Registrar retiro
+    </button>
+
+    <div class="result-box" id="result-box">
+      <div>✅ Retiro registrado</div>
+      <div class="res-num" id="res-stock">—</div>
+      <div class="res-txt" id="res-txt">unidades quedan en bodega</div>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="text-align:center;padding:24px;color:#C00">
+    <div style="font-size:32px;margin-bottom:8px">🔴</div>
+    <div style="font-weight:700;font-size:16px">Producto agotado</div>
+    <div style="color:#888;font-size:13px;margin-top:6px">Contacte a la bodega para reposición</div>
+  </div>
+  {% endif %}
+
+  <!-- Historial reciente -->
+  {% if movimientos %}
+  <div class="card">
+    <div class="section-title">📋 Últimos movimientos</div>
+    <div class="mov-list">
+      {% for m in movimientos %}
+      <div class="mov-item">
+        <div class="mov-dot {% if m.tipo == 'entrada' %}dot-e{% else %}dot-s{% endif %}"></div>
+        <div class="mov-info">
+          <div class="mov-tipo {% if m.tipo == 'entrada' %}tipo-e{% else %}tipo-s{% endif %}">
+            {% if m.tipo == 'entrada' %}📥 ENTRADA{% else %}📤 SALIDA{% endif %}
+            — {{ m.cantidad }} {{ producto.unidad }}
+          </div>
+          <div class="mov-detalle">
+            {% if m.edificio %}{{ m.edificio }}{% endif %}
+            {% if m.usuario %} · {{ m.usuario }}{% endif %}
+          </div>
+          <div class="mov-meta">{{ m.fecha or '' }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<div class="footer">Bodega de Aseo — Colegio Centenario de Temuco</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const PID = {{ producto.id }};
+
+function toast(msg, tipo='', ms=3000){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + tipo;
+  clearTimeout(t._to);
+  t._to = setTimeout(()=>{ t.classList.remove('show'); }, ms);
+}
+
+async function registrarSalida(){
+  const nombre   = document.getElementById('f-nombre').value.trim();
+  const edificio = document.getElementById('f-edificio').value.trim();
+  const cantidad = parseInt(document.getElementById('f-cantidad').value) || 0;
+  const pin      = document.getElementById('f-pin').value.trim();
+
+  if(!nombre)   { toast('Ingresa tu nombre', 'error'); return; }
+  if(!edificio) { toast('Selecciona el edificio', 'error'); return; }
+  if(cantidad <= 0) { toast('Ingresa una cantidad válida', 'error'); return; }
+  if(!pin)      { toast('Ingresa el PIN de bodega', 'error'); return; }
+
+  const btn = document.getElementById('btn-salida');
+  btn.disabled = true;
+  btn.textContent = 'Registrando...';
+
+  try {
+    const r = await fetch(`/api/productos/${PID}/salida-publica`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({nombre, edificio, cantidad, pin})
+    });
+    const d = await r.json();
+
+    if(d.error){
+      toast('❌ ' + d.error, 'error', 4000);
+      btn.disabled = false;
+      btn.textContent = '📤 Registrar retiro';
+      return;
+    }
+
+    // Éxito
+    document.getElementById('stock-num').textContent = d.stock_nuevo;
+    document.getElementById('res-stock').textContent = d.stock_nuevo;
+    document.getElementById('res-txt').textContent = `{{ producto.unidad }} quedan en bodega`;
+    document.getElementById('result-box').classList.add('show');
+
+    // Limpiar formulario
+    document.getElementById('f-nombre').value = '';
+    document.getElementById('f-cantidad').value = '';
+    document.getElementById('f-pin').value = '';
+    document.getElementById('f-edificio').value = '';
+
+    // Actualizar badge de estado
+    const stockNum = document.getElementById('stock-num');
+    stockNum.className = 'stock-num' + (d.stock_nuevo === 0 ? ' zero' : '');
+
+    toast('✅ Retiro registrado correctamente', 'success');
+    btn.textContent = '📤 Registrar retiro';
+    if(d.stock_nuevo <= 0) btn.disabled = true;
+    else btn.disabled = false;
+
+    // Scroll al resultado
+    document.getElementById('result-box').scrollIntoView({behavior:'smooth', block:'center'});
+
+  } catch(e){
+    toast('Error de conexión. Intenta nuevamente.', 'error');
+    btn.disabled = false;
+    btn.textContent = '📤 Registrar retiro';
+  }
+}
+
+// Enter en PIN lanza registro
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('f-pin').addEventListener('keydown', e=>{
+    if(e.key === 'Enter') registrarSalida();
+  });
+});
+</script>
+</body>
+</html>
