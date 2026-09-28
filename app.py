@@ -996,7 +996,7 @@ def guia_page():
         edificios=EDIFICIOS)
 
 @app.route('/guia_entrada')
-@admin_required
+@operador_required
 def guia_entrada_page():
     return render_template('guia_entrada.html', user=session['user'], rol=session['rol'])
 
