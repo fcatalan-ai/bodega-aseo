@@ -315,7 +315,6 @@ def salida_publica(pid):
     return jsonify({'ok': True, 'stock_nuevo': nuevo_stock['stock_actual'] if nuevo_stock else 0})
 
 @app.route('/api/productos/<int:pid>/qr')
-@login_required
 def get_qr(pid):
     """Genera imagen QR con la URL publica del producto."""
     import qrcode
