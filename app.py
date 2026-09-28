@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, redirect, session, send_file
-import os, io
+import os, io, base64
 from datetime import datetime
 from functools import wraps
 
@@ -74,13 +74,11 @@ def init_db():
         id {PK}, nombre TEXT, email TEXT UNIQUE,
         password TEXT, rol TEXT DEFAULT 'edificio', edificio TEXT
     )''')
-    # Usuario unico compartido
     if mode == 'pg':
         admin_email = os.environ.get('ADMIN_EMAIL','bodega@colegio.cl')
         admin_pass  = os.environ.get('ADMIN_PASS','bodega2025')
         cur.execute("INSERT INTO usuarios (nombre,email,password,rol,edificio) VALUES (%s,%s,%s,%s,%s) ON CONFLICT (email) DO NOTHING",
             ('Bodega', admin_email, admin_pass, 'admin', ''))
-        # Siempre actualizar credenciales al arrancar
         cur.execute("UPDATE usuarios SET password=%s, email=%s WHERE rol='admin'",
             (admin_pass, admin_email))
     else:
@@ -139,7 +137,7 @@ def crear_usuario():
     if not nombre or not email or not password:
         return jsonify({'error':'Todos los campos son requeridos'}), 400
     try:
-        db_execute("INSERT INTO usuarios (nombre,email,password,rol,edificio) VALUES (?,?,?,?,?)",
+        db_run("INSERT INTO usuarios (nombre,email,password,rol,edificio) VALUES (?,?,?,?,?)",
                   (nombre, email, password, rol, edificio))
         return jsonify({'ok': True})
     except Exception as e:
@@ -153,7 +151,7 @@ def eliminar_usuario(uid):
     u = db_fetchone("SELECT rol FROM usuarios WHERE id=?", (uid,))
     if u and u['rol'] == 'admin':
         return jsonify({'error': 'No se puede eliminar al administrador'}), 400
-    db_execute("DELETE FROM usuarios WHERE id=?", (uid,))
+    db_run("DELETE FROM usuarios WHERE id=?", (uid,))
     return jsonify({'ok': True})
 
 @app.route('/admin/usuarios/<int:uid>/password', methods=['PUT'])
@@ -163,7 +161,7 @@ def cambiar_password(uid):
     password = data.get('password','').strip()
     if not password:
         return jsonify({'error':'Password requerido'}), 400
-    db_execute("UPDATE usuarios SET password=? WHERE id=?", (password, uid))
+    db_run("UPDATE usuarios SET password=? WHERE id=?", (password, uid))
     return jsonify({'ok': True})
 
 @app.route('/login', methods=['GET','POST'])
@@ -258,20 +256,259 @@ def eliminar_producto(pid):
     db_run("UPDATE productos SET activo=FALSE WHERE id=?", (pid,))
     return jsonify({'ok':True})
 
+# ── PAGINA PUBLICA POR QR (sin login) ────────────────────────────────────────
+@app.route('/producto/<int:pid>/publico')
+def producto_publico(pid):
+    p = db_fetchone("SELECT * FROM productos WHERE id=? AND activo=TRUE", (pid,))
+    if not p:
+        return "Producto no encontrado", 404
+    movs = db_fetchall(
+        """SELECT tipo, cantidad, edificio, usuario, observacion, fecha
+           FROM movimientos WHERE producto_id=?
+           ORDER BY created_at DESC LIMIT 10""", (pid,))
+    return render_template('producto_publico.html',
+        producto=p, movimientos=movs, edificios=EDIFICIOS)
+
+@app.route('/api/productos/<int:pid>/salida-publica', methods=['POST'])
+def salida_publica(pid):
+    """Registra salida rapida desde la pagina publica (sin login, con PIN)."""
+    PIN_BODEGA = os.environ.get('PIN_BODEGA', '')
+    d = request.json
+    pin      = str(d.get('pin', '')).strip()
+    nombre   = str(d.get('nombre', '')).strip()
+    edificio = str(d.get('edificio', '')).strip()
+    cant     = int(d.get('cantidad', 0))
+
+    if not PIN_BODEGA:
+        return jsonify({'error': 'PIN_BODEGA no configurado en el servidor'}), 500
+    if pin != PIN_BODEGA:
+        return jsonify({'error': 'PIN incorrecto'}), 403
+    if not nombre:
+        return jsonify({'error': 'El nombre es obligatorio'}), 400
+    if not edificio:
+        return jsonify({'error': 'Selecciona el edificio'}), 400
+    if cant <= 0:
+        return jsonify({'error': 'Cantidad invalida'}), 400
+
+    p = db_fetchone("SELECT * FROM productos WHERE id=? AND activo=TRUE", (pid,))
+    if not p:
+        return jsonify({'error': 'Producto no encontrado'}), 404
+    if p['stock_actual'] < cant:
+        return jsonify({'error': f'Stock insuficiente. Disponible: {p["stock_actual"]} {p["unidad"]}'}), 400
+
+    fecha = datetime.now().strftime('%d-%m-%Y')
+    conn, mode = get_db()
+    cur = conn.cursor()
+    if mode == 'pg':
+        cur.execute(
+            "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+            (pid, 'salida', cant, edificio, nombre, '[Salida QR]', fecha))
+        cur.execute("UPDATE productos SET stock_actual=stock_actual-%s WHERE id=%s", (cant, pid))
+    else:
+        cur.execute(
+            "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (?,?,?,?,?,?,?)",
+            (pid, 'salida', cant, edificio, nombre, '[Salida QR]', fecha))
+        cur.execute("UPDATE productos SET stock_actual=stock_actual-? WHERE id=?", (cant, pid))
+    conn.commit(); conn.close()
+
+    nuevo_stock = db_fetchone("SELECT stock_actual FROM productos WHERE id=?", (pid,))
+    return jsonify({'ok': True, 'stock_nuevo': nuevo_stock['stock_actual'] if nuevo_stock else 0})
+
+@app.route('/api/productos/<int:pid>/qr')
+@login_required
+def get_qr(pid):
+    """Genera imagen QR con la URL publica del producto."""
+    import qrcode
+    p = db_fetchone("SELECT nombre FROM productos WHERE id=?", (pid,))
+    if not p:
+        return jsonify({'error': 'No encontrado'}), 404
+
+    base = request.host_url.rstrip('/')
+    url = f"{base}/producto/{pid}/publico"
+
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L,
+                        box_size=8, border=3)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#0D4F3C", back_color="white")
+
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png',
+                     download_name=f'qr_{p["nombre"].replace(" ","_")}.png')
+
+# ── PDF GUIA DE SALIDA ─────────────────────────────────────────────────────────
+@app.route('/api/guias/pdf', methods=['POST'])
+@login_required
+def generar_pdf_guia():
+    """Genera PDF de guia de salida con firma digital."""
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        return jsonify({'error': 'fpdf2 no instalado'}), 500
+
+    d = request.json
+    responsable = d.get('responsable', '')
+    edificio    = d.get('edificio', '')
+    fecha       = d.get('fecha', '')
+    obs         = d.get('obs', '')
+    items       = d.get('items', [])
+    guia_id     = d.get('guia_id', '')
+    firma_b64   = d.get('firma', '')  # data:image/png;base64,...
+
+    def safe(txt):
+        repl = {'á':'a','é':'e','í':'i','ó':'o','ú':'u',
+                '\xe1':'a','\xe9':'e','\xed':'i','\xf3':'o','\xfa':'u',
+                '\xc1':'A','\xc9':'E','\xcd':'I','\xd3':'O','\xda':'U',
+                '\xf1':'n','\xd1':'N','\xfc':'u','\xdc':'U',
+                '—':'-','–':'-','“':'"','”':'"',
+                '\xbf':'?','\xa1':'!'}
+        out = ''
+        for ch in str(txt):
+            out += repl.get(ch, ch if ord(ch) < 256 else '?')
+        return out
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_margins(15, 15, 15)
+
+    # Encabezado verde
+    pdf.set_fill_color(13, 79, 60)
+    pdf.rect(0, 0, 210, 28, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Helvetica', 'B', 16)
+    pdf.set_xy(15, 6)
+    pdf.cell(0, 8, safe('Colegio Centenario de Temuco'), ln=True)
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_xy(15, 15)
+    pdf.cell(0, 7, safe('Bodega de Aseo - Guia de Salida'), ln=True)
+
+    pdf.set_font('Helvetica', 'B', 11)
+    pdf.set_xy(140, 8)
+    pdf.cell(55, 8, safe(guia_id), align='R')
+
+    pdf.set_text_color(0, 0, 0)
+
+    # Datos guia
+    pdf.set_xy(15, 33)
+    pdf.set_fill_color(240, 247, 244)
+    pdf.rect(15, 33, 180, 26, 'F')
+    pdf.set_font('Helvetica', 'B', 9)
+    pdf.set_xy(18, 36)
+    pdf.cell(45, 6, safe('Responsable del retiro:'))
+    pdf.set_font('Helvetica', '', 9)
+    pdf.cell(0, 6, safe(responsable), ln=True)
+
+    pdf.set_font('Helvetica', 'B', 9)
+    pdf.set_x(18)
+    pdf.cell(45, 6, safe('Edificio de destino:'))
+    pdf.set_font('Helvetica', '', 9)
+    pdf.cell(60, 6, safe(edificio))
+    pdf.set_font('Helvetica', 'B', 9)
+    pdf.cell(20, 6, 'Fecha:')
+    pdf.set_font('Helvetica', '', 9)
+    pdf.cell(0, 6, safe(fecha), ln=True)
+
+    if obs:
+        pdf.set_font('Helvetica', 'B', 9)
+        pdf.set_x(18)
+        pdf.cell(45, 6, 'Observaciones:')
+        pdf.set_font('Helvetica', '', 9)
+        pdf.cell(0, 6, safe(obs), ln=True)
+
+    # Tabla de productos
+    pdf.set_xy(15, 64)
+    pdf.set_fill_color(26, 107, 82)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Helvetica', 'B', 9)
+    pdf.cell(10, 7, '#', fill=True, border=0, align='C')
+    pdf.cell(105, 7, 'Producto', fill=True, border=0)
+    pdf.cell(30, 7, 'Cantidad', fill=True, border=0, align='C')
+    pdf.cell(35, 7, 'Unidad', fill=True, border=0, align='C')
+    pdf.ln()
+
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Helvetica', '', 9)
+    for i, it in enumerate(items, 1):
+        if i % 2 == 0:
+            pdf.set_fill_color(245, 250, 248)
+        else:
+            pdf.set_fill_color(255, 255, 255)
+        pdf.cell(10, 7, str(i), fill=True, border=0, align='C')
+        pdf.cell(105, 7, safe(it.get('nombre', '')), fill=True, border=0)
+        pdf.cell(30, 7, str(it.get('cantidad', '')), fill=True, border=0, align='C')
+        pdf.cell(35, 7, safe(it.get('unidad', '')), fill=True, border=0, align='C')
+        pdf.ln()
+
+    pdf.set_fill_color(224, 235, 224)
+    pdf.set_font('Helvetica', 'B', 9)
+    total_cant = sum(int(it.get('cantidad', 0)) for it in items)
+    pdf.cell(10, 7, '', fill=True, border=0)
+    pdf.cell(105, 7, safe(f'Total: {len(items)} producto(s)'), fill=True, border=0)
+    pdf.cell(30, 7, str(total_cant), fill=True, border=0, align='C')
+    pdf.cell(35, 7, 'unidades', fill=True, border=0, align='C')
+    pdf.ln(14)
+
+    # Firma digital
+    firma_insertada = False
+    if firma_b64 and ',' in firma_b64:
+        try:
+            from PIL import Image as PILImage
+            firma_data = base64.b64decode(firma_b64.split(',', 1)[1])
+            img_firma = PILImage.open(io.BytesIO(firma_data)).convert('RGBA')
+            fondo = PILImage.new('RGB', img_firma.size, (255, 255, 255))
+            fondo.paste(img_firma, mask=img_firma.split()[3])
+            buf_firma = io.BytesIO()
+            fondo.save(buf_firma, format='PNG')
+            buf_firma.seek(0)
+
+            pdf.set_font('Helvetica', 'B', 9)
+            pdf.cell(0, 6, safe('Firma del responsable:'), ln=True)
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                tmp.write(buf_firma.read())
+                tmp_path = tmp.name
+            pdf.image(tmp_path, x=15, y=pdf.get_y(), w=70, h=28)
+            os.unlink(tmp_path)
+            pdf.set_y(pdf.get_y() + 32)
+            firma_insertada = True
+        except Exception:
+            pass
+
+    if not firma_insertada:
+        pdf.set_font('Helvetica', '', 9)
+        pdf.cell(0, 6, '_' * 45 + '   ' + '_' * 30, ln=True)
+        pdf.set_font('Helvetica', '', 8)
+        pdf.cell(0, 5, safe('     Firma del responsable                    RUT'), ln=True)
+
+    pdf.ln(4)
+    pdf.set_font('Helvetica', '', 7)
+    pdf.set_text_color(150, 150, 150)
+    pdf.set_x(15)
+    pdf.cell(0, 5, safe(f'Generado el {datetime.now().strftime("%d-%m-%Y %H:%M")} - Sistema Bodega Aseo - Colegio Centenario de Temuco'), align='C')
+
+    buf = io.BytesIO()
+    pdf.output(buf)
+    buf.seek(0)
+    pdf_b64 = base64.b64encode(buf.read()).decode('utf-8')
+    return jsonify({'ok': True, 'pdf_b64': pdf_b64, 'nombre': f'{guia_id}.pdf'})
+
+
 # ── MOVIMIENTOS ───────────────────────────────────────────────────────────────
 @app.route('/api/movimientos', methods=['POST'])
 @login_required
 def registrar_movimiento():
     d       = request.json
     pid     = int(d['producto_id'])
-    tipo    = d['tipo']  # 'entrada' o 'salida'
+    tipo    = d['tipo']
     cant    = int(d['cantidad'])
     edificio= d.get('edificio', session.get('edificio',''))
     obs     = d.get('observacion','')
     fecha   = d.get('fecha', datetime.now().strftime('%d-%m-%Y'))
     usuario = session['user']
 
-    # Verificar stock suficiente en salida
     if tipo == 'salida':
         p = db_fetchone("SELECT stock_actual FROM productos WHERE id=?", (pid,))
         if not p: return jsonify({'error':'Producto no encontrado'}), 404
@@ -328,21 +565,16 @@ def stats():
 @app.route('/api/kpis')
 @login_required
 def kpis():
-    # Stock actual por categoria
     por_cat = db_fetchall(
         "SELECT categoria, COUNT(*) as productos, SUM(stock_actual) as stock_total FROM productos WHERE activo=TRUE GROUP BY categoria ORDER BY stock_total DESC")
-    # Alertas stock minimo
     alertas = db_fetchall(
         "SELECT * FROM productos WHERE activo=TRUE AND stock_actual <= stock_minimo AND stock_minimo > 0 ORDER BY stock_actual ASC")
-    # Consumo por edificio (salidas)
     por_edificio = db_fetchall(
         "SELECT edificio, SUM(cantidad) as total FROM movimientos WHERE tipo='salida' AND edificio!='' GROUP BY edificio ORDER BY total DESC")
-    # Consumo mensual (ultimos 6 meses)
     consumo_mes = db_fetchall(
         """SELECT fecha, SUM(CASE WHEN tipo='entrada' THEN cantidad ELSE 0 END) as entradas,
                   SUM(CASE WHEN tipo='salida' THEN cantidad ELSE 0 END) as salidas
            FROM movimientos GROUP BY fecha ORDER BY fecha DESC LIMIT 100""")
-    # Agrupar por mes
     mes_dict = {}
     for r in consumo_mes:
         f = str(r.get('fecha',''))
@@ -356,14 +588,12 @@ def kpis():
                 mes_dict[mes_key]['salidas']  += int(r['salidas'] or 0)
     consumo_mensual = [{'mes':k,'entradas':v['entradas'],'salidas':v['salidas']}
                        for k,v in sorted(mes_dict.items())[-12:]]
-    # Productos mas consumidos
     mas_consumidos = db_fetchall(
         """SELECT p.nombre, p.categoria, p.unidad, p.stock_actual,
                   COALESCE(SUM(CASE WHEN m.tipo='salida' THEN m.cantidad ELSE 0 END),0) as total_salidas
            FROM productos p LEFT JOIN movimientos m ON p.id=m.producto_id
            WHERE p.activo=TRUE GROUP BY p.id, p.nombre, p.categoria, p.unidad, p.stock_actual
            ORDER BY total_salidas DESC LIMIT 10""")
-    # Consumo por edificio por producto (top)
     consumo_ed_prod = db_fetchall(
         """SELECT m.edificio, p.nombre, SUM(m.cantidad) as total
            FROM movimientos m JOIN productos p ON m.producto_id=p.id
@@ -391,7 +621,7 @@ def export_stock():
     from openpyxl.styles import Font, PatternFill, Alignment
     rows = db_fetchall("SELECT * FROM productos WHERE activo=TRUE ORDER BY categoria, nombre")
     wb = openpyxl.Workbook(); ws = wb.active; ws.title="Stock Actual"
-    headers = ['ID','Nombre','Categoría','Unidad','Stock Actual','Stock Mínimo','Estado']
+    headers = ['ID','Nombre','Categoria','Unidad','Stock Actual','Stock Minimo','Estado']
     for col,h in enumerate(headers,1):
         cell = ws.cell(row=1,column=col,value=h)
         cell.font = Font(bold=True,color='FFFFFF')
@@ -399,7 +629,7 @@ def export_stock():
         cell.alignment = Alignment(horizontal='center')
         ws.column_dimensions[ws.cell(row=1,column=col).column_letter].width = 18
     for ri,r in enumerate(rows,2):
-        estado = 'BAJO MÍNIMO' if r['stock_actual'] <= r['stock_minimo'] and r['stock_minimo']>0 else 'OK'
+        estado = 'BAJO MINIMO' if r['stock_actual'] <= r['stock_minimo'] and r['stock_minimo']>0 else 'OK'
         for col,val in enumerate([r['id'],r['nombre'],r['categoria'],r['unidad'],r['stock_actual'],r['stock_minimo'],estado],1):
             ws.cell(row=ri,column=col,value=val)
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
@@ -417,7 +647,7 @@ def export_movimientos():
            FROM movimientos m JOIN productos p ON m.producto_id=p.id
            ORDER BY m.created_at DESC""")
     wb = openpyxl.Workbook(); ws = wb.active; ws.title="Movimientos"
-    headers = ['Fecha','Tipo','Producto','Unidad','Cantidad','Edificio','Usuario','Observación']
+    headers = ['Fecha','Tipo','Producto','Unidad','Cantidad','Edificio','Usuario','Observacion']
     for col,h in enumerate(headers,1):
         cell = ws.cell(row=1,column=col,value=h)
         cell.font = Font(bold=True,color='FFFFFF')
@@ -431,29 +661,22 @@ def export_movimientos():
     return send_file(buf,download_name='movimientos_bodega.xlsx',as_attachment=True,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-# ── USUARIOS ──────────────────────────────────────────────────────────────────
-
-
-
 @app.route('/api/importar', methods=['POST'])
 @login_required
 def importar_excel():
     if 'archivo' not in request.files:
-        return jsonify({'error':'No se envió archivo'}), 400
+        return jsonify({'error':'No se envio archivo'}), 400
     file = request.files['archivo']
     if not file.filename.lower().endswith(('.xlsx','.xls')):
         return jsonify({'error':'Solo se aceptan archivos Excel (.xlsx)'}), 400
     try:
         import openpyxl
         wb = openpyxl.load_workbook(io.BytesIO(file.read()), data_only=True)
-        # Buscar hoja PRODUCTOS
         ws = None
         for name in wb.sheetnames:
             if 'PROD' in name.upper():
                 ws = wb[name]; break
         if ws is None: ws = wb.active
-
-        # Columnas fijas: A=Nombre, B=Categoria, C=Unidad, D=Stock actual, E=Stock minimo
         creados = 0
         errores = []
         for row_num in range(4, ws.max_row + 1):
@@ -492,9 +715,7 @@ def importar_excel():
 def kpis_filtrado():
     fecha_desde = request.args.get('desde','')
     fecha_hasta = request.args.get('hasta','')
-    mes         = request.args.get('mes','')  # formato MM-YYYY
-
-    # Construir filtro de fechas
+    mes         = request.args.get('mes','')
     filtro_sql = "WHERE tipo='salida'"
     params = []
     if mes:
@@ -506,35 +727,26 @@ def kpis_filtrado():
     elif fecha_desde:
         filtro_sql += " AND fecha >= ?"
         params.append(fecha_desde)
-
-    # Total entradas y salidas en periodo
     filtro_ent = filtro_sql.replace("tipo='salida'","tipo='entrada'")
     total_sal = db_fetchone(
         f"SELECT COALESCE(SUM(cantidad),0) as s FROM movimientos {filtro_sql}", params)
     total_ent = db_fetchone(
         f"SELECT COALESCE(SUM(cantidad),0) as s FROM movimientos {filtro_ent}", params)
-
-    # Salidas por edificio en periodo
     por_edificio = db_fetchall(
         f"""SELECT edificio, SUM(cantidad) as total
             FROM movimientos {filtro_sql} AND edificio!=''
             GROUP BY edificio ORDER BY total DESC""", params)
-
-    # Salidas por producto en periodo
     por_producto = db_fetchall(
         f"""SELECT p.nombre, p.categoria, p.unidad, SUM(m.cantidad) as total
             FROM movimientos m JOIN productos p ON m.producto_id=p.id
             {filtro_sql}
             GROUP BY p.id, p.nombre, p.categoria, p.unidad
             ORDER BY total DESC LIMIT 15""", params)
-
-    # Movimientos detalle
     detalle = db_fetchall(
         f"""SELECT m.fecha, m.tipo, p.nombre, p.unidad, m.cantidad, m.edificio, m.usuario
             FROM movimientos m JOIN productos p ON m.producto_id=p.id
             {filtro_sql}
             ORDER BY m.created_at DESC LIMIT 100""", params)
-
     return jsonify({
         'total_salidas':  total_sal['s'] if total_sal else 0,
         'total_entradas': total_ent['s'] if total_ent else 0,
@@ -542,8 +754,6 @@ def kpis_filtrado():
         'por_producto':   por_producto,
         'detalle':        detalle,
     })
-
-
 
 @app.route('/api/movimientos/historial')
 @login_required
@@ -554,7 +764,6 @@ def get_historial():
     q        = request.args.get('q','')
     desde    = request.args.get('desde','')
     hasta    = request.args.get('hasta','')
-
     sql = """SELECT m.id, m.fecha, m.tipo, m.cantidad, m.edificio,
                     m.usuario, m.observacion, m.producto_id,
                     p.nombre as producto_nombre, p.categoria, p.unidad
@@ -569,9 +778,6 @@ def get_historial():
         parts = desde.split('-')
         if len(parts)==3:
             yyyy,mm,dd = parts
-            # Convertir fecha de la BD a YYYYMMDD para comparar numéricamente
-            # DD-MM-YYYY -> YYYYMMDD: substr(7,4)||substr(4,2)||substr(1,2)
-            # YYYY-MM-DD -> YYYYMMDD: replace('-','')
             desde_num = yyyy+mm+dd
             sql += (" AND (CASE WHEN SUBSTR(m.fecha,3,1)='-'"
                     " THEN SUBSTR(m.fecha,7,4)||SUBSTR(m.fecha,4,2)||SUBSTR(m.fecha,1,2)"
@@ -602,14 +808,10 @@ def movimientos_page():
 @login_required
 def editar_movimiento(mid):
     d = request.json
-    # Obtener movimiento original
     mov = db_fetchone("SELECT * FROM movimientos WHERE id=?", (mid,))
     if not mov: return jsonify({'error':'No encontrado'}), 404
-
     nueva_cant = int(d.get('cantidad', mov['cantidad']))
-    nuevo_tipo = d.get('tipo', mov['tipo'])
     dif = nueva_cant - mov['cantidad']
-
     conn2, mode2 = get_db()
     cur2 = conn2.cursor()
     if mode2 == 'pg':
@@ -618,7 +820,6 @@ def editar_movimiento(mid):
             (nueva_cant, d.get('edificio', mov['edificio']),
              d.get('observacion', mov['observacion']),
              d.get('fecha', mov['fecha']), mid))
-        # Ajustar stock: si era salida, revertir diferencia
         if mov['tipo'] == 'salida':
             cur2.execute("UPDATE productos SET stock_actual=stock_actual-%s WHERE id=%s", (dif, mov['producto_id']))
         else:
@@ -642,7 +843,6 @@ def editar_movimiento(mid):
 def eliminar_movimiento(mid):
     mov = db_fetchone("SELECT * FROM movimientos WHERE id=?", (mid,))
     if not mov: return jsonify({'error':'No encontrado'}), 404
-    # Revertir stock
     conn2, mode2 = get_db()
     cur2 = conn2.cursor()
     delta = mov['cantidad'] if mov['tipo'] == 'salida' else -mov['cantidad']
@@ -656,12 +856,11 @@ def eliminar_movimiento(mid):
     conn2.close()
     return jsonify({'ok': True})
 
-
 @app.route('/api/importar/movimientos', methods=['POST'])
 @login_required
 def importar_movimientos():
     if 'archivo' not in request.files:
-        return jsonify({'error':'No se envió archivo'}), 400
+        return jsonify({'error':'No se envio archivo'}), 400
     file = request.files['archivo']
     if not file.filename.lower().endswith(('.xlsx','.xls')):
         return jsonify({'error':'Solo se aceptan archivos Excel (.xlsx)'}), 400
@@ -673,8 +872,6 @@ def importar_movimientos():
             if 'MOV' in name.upper():
                 ws = wb[name]; break
         if ws is None: ws = wb.active
-
-        # Columnas: A=Producto, B=Tipo, C=Cantidad, D=Edificio, E=Fecha, F=Observacion
         creados = 0
         errores = []
         for row_num in range(4, ws.max_row + 1):
@@ -682,65 +879,47 @@ def importar_movimientos():
                 v = ws.cell(row=row_num, column=col).value
                 if v is None: return ''
                 return str(v).strip()
-
             def gv_fecha(col):
                 v = ws.cell(row=row_num, column=col).value
                 if v is None: return ''
-                # Si es objeto datetime de Excel
                 if hasattr(v, 'strftime'):
                     return v.strftime('%d-%m-%Y')
                 s = str(v).strip()
-                # Si tiene hora: "01 00:00:00-02-2026" -> limpiar
                 import re
-                # Formato YYYY-MM-DD
                 if re.match(r'^\d{4}-\d{2}-\d{2}', s):
                     parts = s[:10].split('-')
                     return f"{parts[2]}-{parts[1]}-{parts[0]}"
-                # Formato con hora basura: "DD 00:00:00-MM-YYYY"
                 m = re.match(r'^(\d{1,2})\s+[\d:]+[-](\d{2})[-](\d{4})', s)
                 if m:
                     return f"{m.group(1).zfill(2)}-{m.group(2)}-{m.group(3)}"
-                # DD-MM-YYYY ya correcto
                 return s
-
             nombre   = gv(1)
             tipo     = gv(2).lower()
             cant_raw = gv(3)
             edificio = gv(4)
             fecha    = gv_fecha(5)
             obs      = gv(6)
-
             if not nombre or not tipo or not cant_raw: continue
             if tipo not in ('entrada','salida'): continue
-
             try:
                 cant = int(float(cant_raw))
                 if cant <= 0: continue
-
-                # Buscar producto por nombre
                 prod = db_fetchone(
                     "SELECT id, stock_actual FROM productos WHERE LOWER(nombre)=LOWER(?)", (nombre,))
                 if not prod:
                     errores.append(f"Fila {row_num}: producto '{nombre}' no encontrado")
                     continue
-
-                # Verificar stock en salida
                 if tipo == 'salida' and prod['stock_actual'] < cant:
                     errores.append(f"Fila {row_num}: stock insuficiente para '{nombre}' (hay {prod['stock_actual']})")
                     continue
-
-                # Normalizar fecha a DD-MM-YYYY
+                import re
                 fecha_norm = fecha
                 if fecha:
-                    import re
-                    # Si viene como YYYY-MM-DD convertir
                     if re.match(r'\d{4}-\d{2}-\d{2}', str(fecha)):
                         parts = str(fecha).split('-')
                         fecha_norm = f"{parts[2]}-{parts[1]}-{parts[0]}"
-                    # Si viene como datetime object
                     elif hasattr(fecha, 'strftime'):
                         fecha_norm = fecha.strftime('%d-%m-%Y')
-
                 conn2, mode2 = get_db()
                 cur2 = conn2.cursor()
                 delta = cant if tipo == 'entrada' else -cant
@@ -764,26 +943,20 @@ def importar_movimientos():
                 creados += 1
             except Exception as e:
                 errores.append(f"Fila {row_num}: {str(e)}")
-
         return jsonify({'ok':True,'creados':creados,'errores':errores})
     except Exception as e:
         return jsonify({'error':str(e)}), 500
-
 
 @app.route('/api/resumen-semanal')
 @login_required
 def resumen_semanal():
     from datetime import datetime, timedelta
     hoy = datetime.now()
-    # Semana actual: lunes a hoy
     lunes_actual = hoy - timedelta(days=hoy.weekday())
     lunes_anterior = lunes_actual - timedelta(days=7)
     domingo_anterior = lunes_actual - timedelta(days=1)
-
     def fmt(d): return d.strftime('%d-%m-%Y')
-
     def consumo_semana(desde, hasta):
-        # Buscar en ambos formatos de fecha
         desde_num = desde.strftime('%Y%m%d')
         hasta_num = hasta.strftime('%Y%m%d')
         sql = """SELECT m.edificio, p.nombre, p.unidad, SUM(m.cantidad) as total
@@ -796,11 +969,8 @@ def resumen_semanal():
                  GROUP BY m.edificio, p.nombre, p.unidad
                  ORDER BY m.edificio, total DESC"""
         return db_fetchall(sql, (desde_num, hasta_num))
-
     actual  = consumo_semana(lunes_actual, hoy)
     anterior= consumo_semana(lunes_anterior, domingo_anterior)
-
-    # Totales por edificio
     def por_edificio(rows):
         result = {}
         for r in rows:
@@ -808,26 +978,11 @@ def resumen_semanal():
             if ed not in result:
                 result[ed] = {'total': 0, 'productos': []}
             result[ed]['total'] += r['total']
-            result[ed]['productos'].append({
-                'nombre': r['nombre'],
-                'total': r['total'],
-                'unidad': r['unidad']
-            })
+            result[ed]['productos'].append({'nombre': r['nombre'],'total': r['total'],'unidad': r['unidad']})
         return result
-
     return jsonify({
-        'semana_actual':   {
-            'desde': fmt(lunes_actual),
-            'hasta': fmt(hoy),
-            'por_edificio': por_edificio(actual),
-            'total': sum(r['total'] for r in actual)
-        },
-        'semana_anterior': {
-            'desde': fmt(lunes_anterior),
-            'hasta': fmt(domingo_anterior),
-            'por_edificio': por_edificio(anterior),
-            'total': sum(r['total'] for r in anterior)
-        }
+        'semana_actual':   {'desde': fmt(lunes_actual),'hasta': fmt(hoy),'por_edificio': por_edificio(actual),'total': sum(r['total'] for r in actual)},
+        'semana_anterior': {'desde': fmt(lunes_anterior),'hasta': fmt(domingo_anterior),'por_edificio': por_edificio(anterior),'total': sum(r['total'] for r in anterior)}
     })
 
 @app.route('/reposicion')
@@ -849,10 +1004,9 @@ def guia_entrada_page():
 @app.route('/api/reposicion')
 @login_required
 def get_reposicion():
-    # Productos bajo stock minimo
     bajo = db_fetchall(
-        """SELECT p.*, 
-                  COALESCE((SELECT SUM(cantidad) FROM movimientos 
+        """SELECT p.*,
+                  COALESCE((SELECT SUM(cantidad) FROM movimientos
                             WHERE producto_id=p.id AND tipo='salida'), 0) as total_salidas,
                   COALESCE((SELECT AVG(mes_cant) FROM (
                       SELECT SUM(cantidad) as mes_cant
@@ -864,14 +1018,11 @@ def get_reposicion():
            WHERE p.activo=TRUE AND p.stock_minimo > 0
              AND p.stock_actual <= p.stock_minimo
            ORDER BY (p.stock_actual * 1.0 / NULLIF(p.stock_minimo,0)) ASC""")
-    
-    # Agregar cantidad sugerida = promedio mensual - stock actual (minimo 0)
     for p in bajo:
         sugerido = max(0, round((p['promedio_mensual'] or p['stock_minimo']) - p['stock_actual']))
         if sugerido == 0:
             sugerido = p['stock_minimo'] - p['stock_actual']
         p['cantidad_sugerida'] = max(sugerido, p['stock_minimo'])
-    
     return jsonify(bajo)
 
 @app.route('/api/export/reposicion')
@@ -879,8 +1030,6 @@ def get_reposicion():
 def export_reposicion():
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
-    from datetime import datetime
-    
     bajo = db_fetchall(
         """SELECT p.nombre, p.categoria, p.unidad, p.stock_actual, p.stock_minimo,
                   COALESCE((SELECT AVG(mes_cant) FROM (
@@ -893,29 +1042,24 @@ def export_reposicion():
            WHERE p.activo=TRUE AND p.stock_minimo > 0
              AND p.stock_actual <= p.stock_minimo
            ORDER BY p.categoria, p.nombre""")
-    
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Orden de Reposición"
+    ws.title = "Orden de Reposicion"
     ws.sheet_view.showGridLines = False
-
-    # Título
     ws.merge_cells("A1:G1")
     c = ws["A1"]
-    c.value = f"ORDEN DE REPOSICIÓN — Bodega de Aseo — {datetime.now().strftime('%d-%m-%Y')}"
+    c.value = f"ORDEN DE REPOSICION - Bodega de Aseo - {datetime.now().strftime('%d-%m-%Y')}"
     c.font = Font(bold=True, size=13, color="FFFFFF")
     c.fill = PatternFill("solid", start_color="0D4F3C", fgColor="0D4F3C")
     c.alignment = Alignment(horizontal="center")
     ws.row_dimensions[1].height = 28
-
-    headers = ["Producto","Categoría","Unidad","Stock actual","Stock mínimo","Prom. mensual","Cantidad a pedir"]
+    headers = ["Producto","Categoria","Unidad","Stock actual","Stock minimo","Prom. mensual","Cantidad a pedir"]
     for col,h in enumerate(headers,1):
         cell = ws.cell(row=2,column=col,value=h)
         cell.font = Font(bold=True,color="FFFFFF")
         cell.fill = PatternFill("solid",start_color="1a6b52",fgColor="1a6b52")
         cell.alignment = Alignment(horizontal="center")
         ws.column_dimensions[ws.cell(row=2,column=col).column_letter].width = 18
-
     for ri,p in enumerate(bajo,3):
         prom = round(p['promedio_mensual'] or 0)
         sugerido = max(p['stock_minimo'] - p['stock_actual'], prom)
@@ -927,7 +1071,6 @@ def export_reposicion():
             if col==7:
                 cell.font = Font(bold=True)
             cell.alignment = Alignment(horizontal="center" if col>1 else "left")
-
     buf = io.BytesIO()
     wb.save(buf); buf.seek(0)
     return send_file(buf, download_name=f'orden_reposicion_{datetime.now().strftime("%d%m%Y")}.xlsx',
