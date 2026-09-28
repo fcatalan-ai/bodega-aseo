@@ -97,9 +97,9 @@ tr:hover td{background:#f0f7f4}
     <span>🧴 Bodega de Aseo</span>
     <a href="/dashboard" class="dash">📊 Dashboard</a>
     <a href="/movimientos" style="color:#A8D5C5">📋 Movimientos</a>
-    <a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>
+    {% if rol == 'admin' %}<a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>{% endif %}
     <a href="/guia" style="color:#90caf9">📄 Guía Salida</a>
-    <a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>
+    {% if rol in ('admin','operador') %}<a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>{% endif %}
     <a href="/logout">Salir</a>
   </div>
 </div>
@@ -137,7 +137,7 @@ tr:hover td{background:#f0f7f4}
     </select>
     <button class="btn-out" onclick="window.location='/api/export/stock'">📥 Stock Excel</button>
     <button class="btn-out" onclick="window.location='/movimientos'">📋 Ver Movimientos</button>
-    <button class="btn-green" onclick="abrirModalProducto()">+ Producto</button>
+    {% if rol == 'admin' %}<button class="btn-green" onclick="abrirModalProducto()">+ Producto</button>{% endif %}
   </div>
 
   <div class="table-wrap">
@@ -189,7 +189,7 @@ tr:hover td{background:#f0f7f4}
         <button class="btn-entrada" onclick="abrirMovimiento('entrada')">📥 Entrada</button>
         <button class="btn-salida" onclick="abrirMovimiento('salida')">📤 Salida</button>
       </div>
-      <div style="display:flex;gap:8px">
+      <div id="btns-admin-prod" style="display:flex;gap:8px">
         <button class="btn-sm" style="flex:1" onclick="abrirEditarProducto()">✏️ Editar</button>
         <button class="btn-sm" style="flex:1;color:#c00;border-color:#fcc" onclick="eliminarProducto()">🗑️ Eliminar</button>
       </div>
@@ -285,6 +285,7 @@ tr:hover td{background:#f0f7f4}
 </div>
 
 <script>
+const ROL_USUARIO = "{{ rol }}";
 let productos = [], productoActual = null;
 let sortCol = 'nombre', sortDir = 1;
 
@@ -386,6 +387,9 @@ async function abrirPanel(id){
   showTab('info', document.querySelector('.tab'));
   document.getElementById('panel').classList.add('open');
   document.getElementById('overlay').classList.add('show');
+  // Mostrar/ocultar botones según rol
+  const esAdmin = (ROL_USUARIO === 'admin');
+  document.getElementById('btns-admin-prod').style.display = esAdmin ? 'flex' : 'none';
 }
 
 function cerrarPanel(){
@@ -512,7 +516,7 @@ function verQR(id, nombre){
   img.onerror = ()=>{ img.alt = 'No se pudo cargar el QR'; };
   img.src = imgUrl;
 
-  const pubUrl = window.location.origin + '/producto/' + id + '/publico';
+  const pubUrl = window.location.origin + '/produto/' + id + '/publico';
   document.getElementById('qr-url').textContent = pubUrl;
 
   const dlBtn = document.getElementById('btn-dl-qr');
