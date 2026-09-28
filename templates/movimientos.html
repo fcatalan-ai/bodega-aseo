@@ -71,11 +71,11 @@ tr:hover td{background:#f8faf8}
   <h1>🧴 Bodega de Aseo — Movimientos</h1>
   <div class="topbar-links">
     <a href="/">📦 Inventario</a>
-    <a href="/dashboard">📊 Dashboard</a>
+    {% if rol == 'admin' %}<a href="/dashboard">📊 Dashboard</a>{% endif %}
     <a href="/movimientos" class="active">📋 Movimientos</a>
-    <a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>
+    {% if rol == 'admin' %}<a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>{% endif %}
     <a href="/guia" style="color:#90caf9">📄 Guía Salida</a>
-    <a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>
+    {% if rol in ('admin','operador') %}<a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>{% endif %}
     <a href="/logout">Salir</a>
   </div>
 </div>
@@ -208,6 +208,7 @@ tr:hover td{background:#f8faf8}
 </div>
 
 <script>
+const ROL_USUARIO = "{{ rol }}";
 let tipoActual = 'entrada';
 let movimientos = [];
 let paginaActual = 1;
@@ -274,8 +275,10 @@ function renderTabla(){
       <td style="font-size:12px;color:#888">${m.usuario||'—'}</td>
       <td style="font-size:12px;color:#666;max-width:150px;overflow:hidden;text-overflow:ellipsis">${m.observacion||''}</td>
       <td>
+        ${ROL_USUARIO==='admin'?`
         <button class="btn-sm btn-edit" onclick="abrirEditar(${m.id})">✏️</button>
         <button class="btn-sm btn-del" onclick="eliminar(${m.id},'${(m.producto_nombre||'').replace(/'/g,'')}')">🗑️</button>
+        `:''}
       </td>
     </tr>`).join('');
 
