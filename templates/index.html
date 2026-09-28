@@ -504,7 +504,7 @@ async function eliminarProducto(){
 function verQR(id, nombre){
   document.getElementById('qr-titulo').textContent = '🔲 QR — ' + nombre;
 
-  const imgUrl = '/api/produtos/' + id + '/qr?t=' + Date.now();
+  const imgUrl = '/api/productos/' + id + '/qr?t=' + Date.now();
   const img = document.getElementById('qr-img');
   img.src = '';
   img.alt = 'Cargando QR...';
