@@ -512,7 +512,7 @@ function verQR(id, nombre){
   img.onerror = ()=>{ img.alt = 'No se pudo cargar el QR'; };
   img.src = imgUrl;
 
-  const pubUrl = window.location.origin + '/produto/' + id + '/publico';
+  const pubUrl = window.location.origin + '/producto/' + id + '/publico';
   document.getElementById('qr-url').textContent = pubUrl;
 
   const dlBtn = document.getElementById('btn-dl-qr');
