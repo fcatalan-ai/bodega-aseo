@@ -78,9 +78,24 @@ h1{font-size:1.3rem;font-weight:700;margin-bottom:4px;color:#fff}
 .tbl-preview td{padding:8px 10px;vertical-align:middle}
 .tbl-preview td input[type=number]{background:var(--fondo);border:1px solid var(--borde);color:#fff;border-radius:6px;padding:4px 8px;width:72px;font-size:.83rem}
 .tbl-preview td input[type=number]:focus{outline:none;border-color:#98e6b0}
-.tbl-preview select{background:var(--fondo);border:1px solid var(--borde);color:#fff;border-radius:6px;padding:5px 8px;font-size:.8rem;width:100%;min-width:160px;max-width:220px}
-.tbl-preview select:focus{outline:none;border-color:#98e6b0}
 .match-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+
+/* AUTOCOMPLETE PRODUCTO */
+.ac-wrap{position:relative;display:inline-block;min-width:170px;max-width:240px;width:100%}
+.ac-input{background:var(--fondo);border:1px solid var(--borde);color:#fff;border-radius:6px;padding:5px 28px 5px 8px;font-size:.8rem;width:100%;outline:none;cursor:text}
+.ac-input:focus{border-color:#98e6b0}
+.ac-input.unassigned{border-color:#553;color:#aaa}
+.ac-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:#666;cursor:pointer;font-size:.85rem;padding:0;line-height:1;display:none}
+.ac-clear:hover{color:#e07070}
+.ac-wrap:focus-within .ac-clear,
+.ac-wrap.has-val .ac-clear{display:block}
+.ac-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#1a3028;border:1px solid #2a5040;border-radius:8px;z-index:999;max-height:200px;overflow-y:auto;box-shadow:0 6px 20px #0009;display:none}
+.ac-dropdown.open{display:block}
+.ac-option{padding:7px 11px;cursor:pointer;font-size:.8rem;color:#cfe8d8;border-bottom:1px solid #1f3d2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-option:last-child{border-bottom:none}
+.ac-option:hover,.ac-option.focused{background:#27ae7330;color:#fff}
+.ac-option .ac-cat{font-size:.7rem;color:#6a9a7a;margin-left:6px}
+.ac-none{padding:8px 11px;color:#6a9a7a;font-size:.8rem;font-style:italic}
 .dot-green{background:#27ae73}
 .dot-yellow{background:#f1c40f}
 .dot-red{background:#e74c3c}
@@ -89,7 +104,7 @@ td.td-num{text-align:right;font-family:monospace;font-size:.82rem;color:var(--te
 .skip-btn:hover{border-color:var(--rojo);color:var(--rojo)}
 .skip-btn.skipped{background:#2a1a1a;border-color:#553333;color:#e07070;text-decoration:line-through}
 tr.fila-skip td{opacity:.4}
-tr.fila-skip input,tr.fila-skip select{pointer-events:none}
+tr.fila-skip input,tr.fila-skip .ac-input{pointer-events:none}
 
 /* BOTONES ACCION */
 .acciones{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px;align-items:center}
@@ -295,9 +310,9 @@ function renderPreview(data) {
     let dotColor = score >= 0.8 ? 'dot-green' : score >= 0.3 ? 'dot-yellow' : 'dot-red';
     if (score >= 0.3) matchOk++; else matchNo++;
 
-    const opts = productosDB.map(p =>
-      `<option value="${p.id}" ${p.id == row.producto_id ? 'selected' : ''}>${p.nombre}</option>`
-    ).join('');
+    const matchedNombre = row.producto_id
+      ? (productosDB.find(p => p.id == row.producto_id)?.nombre || '')
+      : '';
 
     const tr = document.createElement('tr');
     tr.id = `fila-${i}`;
@@ -308,11 +323,20 @@ function renderPreview(data) {
       <td class="td-num">$${fmt(row.precio_unit)}</td>
       <td class="td-num">$${fmt(row.valor)}</td>
       <td>
-        <span class="match-dot ${dotColor}"></span>
-        <select id="prod-${i}">
-          <option value="">— Sin asignar —</option>
-          ${opts}
-        </select>
+        <span class="match-dot ${dotColor}" id="dot-${i}"></span>
+        <div class="ac-wrap${matchedNombre ? ' has-val' : ''}" id="acwrap-${i}">
+          <input class="ac-input${!matchedNombre ? ' unassigned' : ''}" id="ac-input-${i}"
+                 type="text" autocomplete="off" spellcheck="false"
+                 placeholder="— Sin asignar —"
+                 value="${matchedNombre}"
+                 oninput="acFilter(${i})"
+                 onfocus="acOpen(${i})"
+                 onblur="acBlur(${i})"
+                 onkeydown="acKey(event,${i})">
+          <button class="ac-clear" onclick="acClear(${i})" tabindex="-1" title="Quitar">✕</button>
+          <div class="ac-dropdown" id="ac-drop-${i}"></div>
+        </div>
+        <input type="hidden" id="prod-${i}" value="${row.producto_id || ''}">
       </td>
       <td>
         <button class="skip-btn" id="skip-${i}" onclick="toggleSkip(${i})" title="Saltar esta fila">✕</button>
@@ -320,12 +344,6 @@ function renderPreview(data) {
     `;
     tbody.appendChild(tr);
   });
-
-  document.getElementById('badge-match').innerHTML =
-    `<span class="badge-ok">✅ ${matchOk} producto${matchOk!=1?'s':''} reconocido${matchOk!=1?'s':''}</span>`;
-  if (matchNo > 0)
-    document.getElementById('badge-nomatch').innerHTML =
-      `<span class="badge-warn">⚠️ ${matchNo} sin asignar</span>`;
 
   actualizarInfo();
 }
@@ -346,13 +364,156 @@ function actualizarInfo() {
     const fila = document.getElementById(`fila-${i}`);
     if (fila && !fila.classList.contains('fila-skip')) {
       activos++;
-      const sel = document.getElementById(`prod-${i}`);
-      if (sel && sel.value) asignados++;
+      const hid = document.getElementById(`prod-${i}`);
+      if (hid && hid.value) asignados++;
     }
   });
   document.getElementById('info-sel').textContent =
     `${asignados} de ${activos} ítems asignados`;
   document.getElementById('btn-confirmar').disabled = (asignados === 0);
+
+  // Actualizar badges
+  let matchOk = 0, matchNo = 0;
+  rows.forEach((_, i) => {
+    const hid = document.getElementById(`prod-${i}`);
+    const fila = document.getElementById(`fila-${i}`);
+    if (!fila || fila.classList.contains('fila-skip')) return;
+    if (hid && hid.value) matchOk++; else matchNo++;
+  });
+  document.getElementById('badge-match').innerHTML =
+    `<span class="badge-ok">✅ ${matchOk} producto${matchOk!=1?'s':''} reconocido${matchOk!=1?'s':''}</span>`;
+  document.getElementById('badge-nomatch').innerHTML =
+    matchNo > 0 ? `<span class="badge-warn">⚠️ ${matchNo} sin asignar</span>` : '';
+}
+
+// ── AUTOCOMPLETE ───────────────────────────────────────────────────────────
+let acFocused = {}; // {idx: focusedOptionIndex}
+
+function normalizeAC(s) {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+}
+
+function acBuildDropdown(idx, query) {
+  const drop = document.getElementById(`ac-drop-${idx}`);
+  const q = normalizeAC(query || '');
+  const matches = productosDB.filter(p => normalizeAC(p.nombre).includes(q));
+  acFocused[idx] = -1;
+
+  if (!matches.length) {
+    drop.innerHTML = `<div class="ac-none">Sin resultados para "${query}"</div>`;
+  } else {
+    drop.innerHTML = matches.map((p, mi) =>
+      `<div class="ac-option" data-id="${p.id}" data-nombre="${p.nombre.replace(/"/g,'&quot;')}" data-mi="${mi}"
+            onmousedown="acSelect(event,${idx})"
+            onmouseover="acHover(${idx},${mi})">
+        ${p.nombre}<span class="ac-cat">${p.categoria || ''}</span>
+      </div>`
+    ).join('');
+  }
+  drop.classList.add('open');
+}
+
+function acOpen(idx) {
+  const inp = document.getElementById(`ac-input-${idx}`);
+  acBuildDropdown(idx, inp.value);
+}
+
+function acFilter(idx) {
+  const inp = document.getElementById(`ac-input-${idx}`);
+  const wrap = document.getElementById(`acwrap-${idx}`);
+  const hid  = document.getElementById(`prod-${idx}`);
+  // Al escribir, limpiar selección actual
+  hid.value = '';
+  wrap.classList.remove('has-val');
+  inp.classList.add('unassigned');
+  acBuildDropdown(idx, inp.value);
+  actualizarInfo();
+}
+
+function acHover(idx, mi) {
+  acFocused[idx] = mi;
+  document.querySelectorAll(`#ac-drop-${idx} .ac-option`).forEach((el,j) =>
+    el.classList.toggle('focused', j === mi));
+}
+
+function acSelect(e, idx) {
+  e.preventDefault();
+  const opt = e.currentTarget;
+  const pid = opt.dataset.id;
+  const nombre = opt.dataset.nombre;
+  acSetValue(idx, pid, nombre);
+}
+
+function acSetValue(idx, pid, nombre) {
+  document.getElementById(`prod-${idx}`).value = pid;
+  const inp = document.getElementById(`ac-input-${idx}`);
+  inp.value = nombre;
+  inp.classList.remove('unassigned');
+  const wrap = document.getElementById(`acwrap-${idx}`);
+  wrap.classList.add('has-val');
+  document.getElementById(`ac-drop-${idx}`).classList.remove('open');
+  // Actualizar dot a verde
+  const dot = document.getElementById(`dot-${idx}`);
+  if (dot) { dot.className = 'match-dot dot-green'; }
+  actualizarInfo();
+}
+
+function acClear(idx) {
+  document.getElementById(`prod-${idx}`).value = '';
+  const inp = document.getElementById(`ac-input-${idx}`);
+  inp.value = '';
+  inp.classList.add('unassigned');
+  document.getElementById(`acwrap-${idx}`).classList.remove('has-val');
+  document.getElementById(`ac-drop-${idx}`).classList.remove('open');
+  const dot = document.getElementById(`dot-${idx}`);
+  if (dot) dot.className = 'match-dot dot-red';
+  actualizarInfo();
+  inp.focus();
+}
+
+function acBlur(idx) {
+  setTimeout(() => {
+    const drop = document.getElementById(`ac-drop-${idx}`);
+    if (drop) drop.classList.remove('open');
+    // Si texto no coincide con ningún producto, limpiar
+    const inp = document.getElementById(`ac-input-${idx}`);
+    const hid = document.getElementById(`prod-${idx}`);
+    if (!hid.value && inp.value) {
+      // intento de match exacto
+      const match = productosDB.find(p =>
+        normalizeAC(p.nombre) === normalizeAC(inp.value));
+      if (match) acSetValue(idx, match.id, match.nombre);
+      else { inp.value = ''; inp.classList.add('unassigned'); }
+    }
+  }, 150);
+}
+
+function acKey(e, idx) {
+  const drop = document.getElementById(`ac-drop-${idx}`);
+  const opts = drop.querySelectorAll('.ac-option');
+  let fi = acFocused[idx] ?? -1;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    fi = Math.min(fi + 1, opts.length - 1);
+    acFocused[idx] = fi;
+    opts.forEach((el,j) => el.classList.toggle('focused', j===fi));
+    opts[fi]?.scrollIntoView({block:'nearest'});
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    fi = Math.max(fi - 1, 0);
+    acFocused[idx] = fi;
+    opts.forEach((el,j) => el.classList.toggle('focused', j===fi));
+    opts[fi]?.scrollIntoView({block:'nearest'});
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (fi >= 0 && opts[fi]) {
+      const opt = opts[fi];
+      acSetValue(idx, opt.dataset.id, opt.dataset.nombre);
+    }
+  } else if (e.key === 'Escape') {
+    drop.classList.remove('open');
+  }
 }
 
 // ── CONFIRMAR ──────────────────────────────────────────────────────────────
