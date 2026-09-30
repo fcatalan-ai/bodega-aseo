@@ -1144,75 +1144,53 @@ def parsear_factura():
             meta['iva']   = parse_monto(r'I\.?V\.?A\.?[^$\n]*\$?\s*([\d.,]+)')
             meta['total'] = parse_monto(r'TOTAL\s*\$?\s*([\d.,]+)')
 
-            # Extraer tabla de productos
-            tables = page.extract_tables({'vertical_strategy':'lines','horizontal_strategy':'lines'})
-            if not tables:
-                tables = page.extract_tables()
+            # Extraer productos: escaneo derecha-izquierda buscando 3 números al final
+            def extraer_numero_cl(tok):
+                cleaned = tok.replace('.', '').replace(',', '')
+                return int(cleaned) if cleaned.isdigit() else None
 
-            for table in (tables or []):
-                header_found = False
-                for row in table:
-                    if not row: continue
-                    cells = [str(c or '').strip() for c in row]
-                    # Detectar fila de encabezado
-                    row_text = ' '.join(cells).upper()
-                    if any(h in row_text for h in ['DESCRIPCION','DESCRIPCIÓN','CANTIDAD','CODIGO']):
-                        header_found = True
-                        continue
-                    if not header_found: continue
-                    # Saltar filas vacias o de totales
-                    if len([c for c in cells if c and c not in ['-','None']]) < 2: continue
-                    if any(kw in row_text for kw in ['NETO','I.V.A','IVA','TOTAL','FORMA DE PAGO','TIMBRE']): continue
+            SKIP_PROD_KW = [
+                'DESCRIPCION','DESCRIPCIÓN','CANTIDAD','PRECIO','VALOR','CODIGO','CÓDIGO',
+                'MONTO NETO','MONTO','I.V.A','IVA','TOTAL','FORMA DE PAGO','FORMA','TIMBRE',
+                'SEÑOR','SEÑORES','R.U.T','RUT','GIRO','DIRECC','COMUN','CIUDAD','TIPO',
+                'FACTURA','ELECTRONICA','ELECTRÓNICA','S.I.I','SII','IMPUESTO','ADICIONAL',
+                'COMERCIALIZADORA','CORPORACION','CORPORACIÓN','COLEGIO','VENTA','ARRIEROS',
+                'EMAIL','TELEFONO','TELÉFONO','PEDRO','RESOLUCION','RESOLUCIÓN','VERIFIQUE',
+                'FECHA','FOLIO','VENDEDOR','BODEGA','CONDICION','CONDICIÓN','NETO',
+                'SUBTOTAL','SUB TOTAL','DESCUENTO','% IMPTO','%IMPTO',
+            ]
 
-                    # Buscar descripcion (columna con texto largo)
-                    nombre = ''
-                    for c in cells:
-                        if c and len(c) > 3 and not re.match(r'^[\d.,\-]+$', c) and c not in ['-']:
-                            nombre = c
-                            break
-                    if not nombre: continue
-
-                    # Buscar cantidad y precio (numeros en las columnas siguientes)
-                    numeros = []
-                    for c in cells:
-                        c2 = c.replace('.','').replace(',','.').strip()
-                        try:
-                            v2 = float(c2)
-                            if v2 > 0 and c2 != nombre:
-                                numeros.append(int(v2))
-                        except: pass
-
-                    cant = numeros[0] if len(numeros) >= 1 else 0
-                    precio = numeros[1] if len(numeros) >= 2 else 0
-                    valor = numeros[-1] if len(numeros) >= 2 else 0
-
-                    if nombre and cant > 0:
-                        rows_parsed.append({
-                            'nombre_factura': nombre,
-                            'cantidad': cant,
-                            'precio_unit': precio,
-                            'valor': valor,
-                        })
-
-        # Si no se encontraron filas con tablas, intentar parse por texto
-        if not rows_parsed:
-            import re
-            # Buscar lineas que parezcan productos: TEXTO NUMERO NUMERO NUMERO
-            pat = re.compile(r'^(.+?)\s{2,}(\d[\d.]*)\s{2,}([\d.]+)\s{2,}([\d.]+)\s*$')
             for ln in lines:
-                m2 = pat.match(ln)
-                if m2:
-                    nombre = m2.group(1).strip()
-                    skip_kw2 = ['NETO','IVA','TOTAL','FORMA','TIMBRE','CODIGO','DESCRIPCION']
-                    if any(kw in nombre.upper() for kw in skip_kw2): continue
-                    try:
-                        cant = int(m2.group(2).replace('.',''))
-                        precio = int(m2.group(3).replace('.',''))
-                        valor = int(m2.group(4).replace('.',''))
-                        if cant > 0:
-                            rows_parsed.append({'nombre_factura': nombre, 'cantidad': cant,
-                                                'precio_unit': precio, 'valor': valor})
-                    except: pass
+                ln_s = ln.strip()
+                if ln_s.startswith('-'): ln_s = ln_s[1:].strip()
+                if not ln_s or len(ln_s) < 5: continue
+                if any(kw in ln_s.upper() for kw in SKIP_PROD_KW): continue
+                tokens = ln_s.split()
+                if len(tokens) < 4: continue
+                # Scan right-to-left collecting trailing integers
+                trailing = []; text_end = len(tokens)
+                for i in range(len(tokens) - 1, -1, -1):
+                    n = extraer_numero_cl(tokens[i])
+                    if n is not None:
+                        trailing.insert(0, n)
+                        text_end = i
+                        if len(trailing) == 3:
+                            break
+                    else:
+                        if trailing:
+                            break  # non-number interrupts sequence
+                if len(trailing) != 3:
+                    continue
+                nombre = ' '.join(tokens[:text_end]).strip()
+                if len(nombre) < 3 or not any(c.isalpha() for c in nombre): continue
+                cant, precio, valor = trailing[0], trailing[1], trailing[2]
+                if cant <= 0 or cant > 9999 or valor <= 0: continue
+                rows_parsed.append({
+                    'nombre_factura': nombre,
+                    'cantidad': cant,
+                    'precio_unit': precio,
+                    'valor': valor,
+                })
 
         # Obtener productos de bodega para matching
         productos = db_fetchall(
