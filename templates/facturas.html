@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Importar Factura — Bodega Aseo</title>
+<style>
+:root{
+  --verde:#0D4F3C; --verde2:#1a6b52; --verde3:#27ae73;
+  --fondo:#0f1f17; --card:#162d22; --borde:#1f3d2e;
+  --texto:#e8f5ee; --texto2:#8ab89a; --naranja:#FFD966;
+  --rojo:#e74c3c; --azul:#90caf9;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:var(--fondo);color:var(--texto);min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:var(--verde);padding:10px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px #0006}
+.topbar .logo{font-weight:700;font-size:1.05rem;color:#fff;white-space:nowrap}
+.topbar .logo span{color:#98e6b0;font-size:.8rem;display:block;font-weight:400}
+.topbar-links{display:flex;gap:12px;flex-wrap:wrap;font-size:.82rem}
+.topbar-links a{color:var(--texto2);text-decoration:none;padding:4px 8px;border-radius:6px;transition:.2s}
+.topbar-links a:hover{background:#ffffff18;color:#fff}
+.topbar-links a.active{color:#98e6b0;font-weight:600}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:.82rem}
+.topbar-right .user-pill{background:#ffffff18;padding:4px 10px;border-radius:20px;color:#cfe8d8}
+.btn-logout{background:none;border:1px solid #ffffff30;color:#ccc;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:.8rem}
+.btn-logout:hover{background:#ffffff18}
+
+/* LAYOUT */
+.page{max-width:1000px;margin:0 auto;padding:24px 16px}
+h1{font-size:1.3rem;font-weight:700;margin-bottom:4px;color:#fff}
+.subtitle{color:var(--texto2);font-size:.87rem;margin-bottom:24px}
+
+/* PASOS */
+.steps{display:flex;gap:0;margin-bottom:28px}
+.step{flex:1;text-align:center;padding:10px 8px;font-size:.78rem;color:var(--texto2);border-bottom:2px solid var(--borde);position:relative}
+.step.active{color:#98e6b0;border-bottom-color:#98e6b0;font-weight:600}
+.step.done{color:var(--verde3);border-bottom-color:var(--verde3)}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--borde);color:var(--texto2);font-size:.75rem;font-weight:700;margin-bottom:4px;display:block;margin:0 auto 4px}
+.step.active .step-num{background:var(--verde2);color:#fff}
+.step.done .step-num{background:var(--verde3);color:#fff}
+
+/* UPLOAD ZONE */
+#zone-upload{display:block}
+#zone-preview{display:none}
+#zone-historial{display:none}
+
+.upload-box{border:2px dashed var(--borde);border-radius:14px;padding:48px 24px;text-align:center;cursor:pointer;transition:.2s;background:var(--card)}
+.upload-box:hover,.upload-box.drag{border-color:#98e6b0;background:#162d2288}
+.upload-box .icon{font-size:3rem;margin-bottom:12px}
+.upload-box h3{font-size:1rem;margin-bottom:6px;color:#fff}
+.upload-box p{color:var(--texto2);font-size:.84rem}
+#input-pdf{display:none}
+.btn-upload{margin-top:16px;background:var(--verde2);color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:600}
+.btn-upload:hover{background:var(--verde3)}
+
+.o-divider{color:var(--texto2);margin:16px 0;font-size:.84rem}
+
+/* CARDS META */
+.meta-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.meta-card{background:var(--card);border:1px solid var(--borde);border-radius:10px;padding:12px 16px}
+.meta-card label{font-size:.72rem;color:var(--texto2);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px}
+.meta-card input{background:transparent;border:none;border-bottom:1px solid var(--borde);color:#fff;font-size:.95rem;font-weight:600;width:100%;outline:none;padding:2px 0}
+.meta-card input:focus{border-bottom-color:#98e6b0}
+.meta-card .val{font-size:.95rem;font-weight:600;color:#fff}
+.meta-card .val.monto{color:var(--naranja)}
+
+/* TABLA PREVIEW */
+.preview-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap}
+.badge-ok{background:#1a6b3a;color:#98e6b0;padding:3px 10px;border-radius:12px;font-size:.78rem;font-weight:600}
+.badge-warn{background:#4a3a00;color:var(--naranja);padding:3px 10px;border-radius:12px;font-size:.78rem;font-weight:600}
+
+.tbl-preview{width:100%;border-collapse:collapse;font-size:.83rem}
+.tbl-preview thead th{background:var(--verde2);color:#fff;padding:8px 10px;text-align:left;font-weight:600}
+.tbl-preview tbody tr{border-bottom:1px solid var(--borde)}
+.tbl-preview tbody tr:hover{background:#1c3527}
+.tbl-preview td{padding:8px 10px;vertical-align:middle}
+.tbl-preview td input[type=number]{background:var(--fondo);border:1px solid var(--borde);color:#fff;border-radius:6px;padding:4px 8px;width:72px;font-size:.83rem}
+.tbl-preview td input[type=number]:focus{outline:none;border-color:#98e6b0}
+.tbl-preview select{background:var(--fondo);border:1px solid var(--borde);color:#fff;border-radius:6px;padding:5px 8px;font-size:.8rem;width:100%;min-width:160px;max-width:220px}
+.tbl-preview select:focus{outline:none;border-color:#98e6b0}
+.match-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.dot-green{background:#27ae73}
+.dot-yellow{background:#f1c40f}
+.dot-red{background:#e74c3c}
+td.td-num{text-align:right;font-family:monospace;font-size:.82rem;color:var(--texto2)}
+.skip-btn{background:none;border:1px solid #444;color:#888;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:.78rem}
+.skip-btn:hover{border-color:var(--rojo);color:var(--rojo)}
+.skip-btn.skipped{background:#2a1a1a;border-color:#553333;color:#e07070;text-decoration:line-through}
+tr.fila-skip td{opacity:.4}
+tr.fila-skip input,tr.fila-skip select{pointer-events:none}
+
+/* BOTONES ACCION */
+.acciones{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px;align-items:center}
+.btn-confirmar{background:var(--verde3);color:#fff;border:none;padding:11px 28px;border-radius:9px;font-size:.95rem;font-weight:700;cursor:pointer;transition:.2s}
+.btn-confirmar:hover{background:#2ecc71}
+.btn-confirmar:disabled{background:#2a5a3a;color:#6a9a7a;cursor:not-allowed}
+.btn-cancelar{background:none;border:1px solid #444;color:#aaa;padding:10px 20px;border-radius:9px;cursor:pointer;font-size:.9rem}
+.btn-cancelar:hover{border-color:#777;color:#fff}
+.btn-historial{background:var(--card);border:1px solid var(--borde);color:var(--texto2);padding:10px 18px;border-radius:9px;cursor:pointer;font-size:.85rem}
+.btn-historial:hover{border-color:#98e6b0;color:#98e6b0}
+
+/* LOADING */
+.loading{display:none;text-align:center;padding:40px;color:var(--texto2)}
+.spinner{width:36px;height:36px;border:3px solid var(--borde);border-top-color:#98e6b0;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ALERT */
+.alert{padding:12px 16px;border-radius:9px;font-size:.87rem;margin-bottom:16px;display:none}
+.alert-err{background:#2a1010;border:1px solid #6b2020;color:#e08080}
+.alert-ok{background:#0f2a1a;border:1px solid #1a6b3a;color:#98e6b0}
+
+/* RESUMEN FINAL */
+.resumen-final{background:var(--card);border:1px solid #1a6b3a;border-radius:12px;padding:24px;text-align:center;margin-top:20px}
+.resumen-final .num{font-size:2.5rem;font-weight:800;color:#98e6b0}
+.resumen-final p{color:var(--texto2);font-size:.9rem;margin-top:6px}
+.btn-nuevo{margin-top:16px;background:var(--verde2);color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:600}
+.btn-nuevo:hover{background:var(--verde3)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">📦 Bodega Aseo<span>Colegio Centenario de Temuco</span></div>
+  <div class="topbar-links">
+    <a href="/">🏠 Inventario</a>
+    {% if rol == 'admin' %}<a href="/dashboard">📊 Dashboard</a>{% endif %}
+    <a href="/movimientos">📋 Movimientos</a>
+    {% if rol == 'admin' %}<a href="/reposicion" style="color:var(--naranja)">🛒 Reposición</a>{% endif %}
+    {% if rol == 'admin' %}<a href="/facturas" class="active" style="color:#c9a0ff">🧾 Facturas</a>{% endif %}
+    <a href="/guia" style="color:#90caf9">📄 Guía Salida</a>
+    {% if rol in ('admin','operador') %}<a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>{% endif %}
+  </div>
+  <div class="topbar-right">
+    <span class="user-pill">👤 {{ user }}</span>
+    <button class="btn-logout" onclick="location='/logout'">Salir</button>
+  </div>
+</div>
+
+<div class="page">
+  <h1>🧾 Importar Factura de Compra</h1>
+  <p class="subtitle">Sube el PDF de la factura electrónica — el sistema detecta los productos y registra las entradas automáticamente.</p>
+
+  <!-- PASOS -->
+  <div class="steps">
+    <div class="step active" id="step1"><span class="step-num">1</span>Subir PDF</div>
+    <div class="step" id="step2"><span class="step-num">2</span>Revisar productos</div>
+    <div class="step" id="step3"><span class="step-num">3</span>Confirmar</div>
+  </div>
+
+  <div class="alert alert-err" id="alerta-err"></div>
+  <div class="alert alert-ok" id="alerta-ok"></div>
+
+  <!-- ZONA 1: UPLOAD -->
+  <div id="zone-upload">
+    <div class="upload-box" id="drop-zone">
+      <div class="icon">📄</div>
+      <h3>Arrastra aquí el PDF de la factura</h3>
+      <p>o haz clic para seleccionar el archivo</p>
+      <button class="btn-upload" onclick="document.getElementById('input-pdf').click()">Seleccionar PDF</button>
+      <input type="file" id="input-pdf" accept=".pdf">
+    </div>
+    <div class="loading" id="loading-parseo">
+      <div class="spinner"></div>
+      <p>Analizando factura…</p>
+    </div>
+  </div>
+
+  <!-- ZONA 2: PREVIEW -->
+  <div id="zone-preview">
+    <!-- Meta -->
+    <div class="meta-grid" id="meta-grid"></div>
+
+    <!-- Tabla -->
+    <div class="preview-header">
+      <div>
+        <span id="badge-match"></span>
+        <span id="badge-nomatch" style="margin-left:6px"></span>
+      </div>
+      <span style="font-size:.78rem;color:var(--texto2)">Ajusta la cantidad y asigna el producto de bodega para cada ítem</span>
+    </div>
+
+    <div style="overflow-x:auto">
+      <table class="tbl-preview">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Descripción en factura</th>
+            <th>Cant.</th>
+            <th style="text-align:right">Precio unit.</th>
+            <th style="text-align:right">Valor</th>
+            <th>Producto en bodega</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-preview"></tbody>
+      </table>
+    </div>
+
+    <div class="acciones">
+      <button class="btn-confirmar" id="btn-confirmar" onclick="confirmar()">✅ Registrar entradas</button>
+      <button class="btn-cancelar" onclick="resetear()">← Volver</button>
+      <span style="font-size:.8rem;color:var(--texto2)" id="info-sel"></span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── ESTADO ─────────────────────────────────────────────────────────────────
+let parsedData = null;
+let productosDB = [];
+
+// ── UPLOAD / DRAG & DROP ───────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const inputPdf = document.getElementById('input-pdf');
+
+dropZone.addEventListener('click', () => inputPdf.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.toLowerCase().endsWith('.pdf')) procesarArchivo(f);
+  else mostrarError('Solo se aceptan archivos PDF.');
+});
+inputPdf.addEventListener('change', () => {
+  if (inputPdf.files[0]) procesarArchivo(inputPdf.files[0]);
+});
+
+function mostrarError(msg) {
+  const el = document.getElementById('alerta-err');
+  el.textContent = '❌ ' + msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 6000);
+}
+function mostrarOk(msg) {
+  const el = document.getElementById('alerta-ok');
+  el.textContent = '✅ ' + msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 5000);
+}
+
+// ── PARSEAR ────────────────────────────────────────────────────────────────
+async function procesarArchivo(file) {
+  document.getElementById('loading-parseo').style.display = 'block';
+  dropZone.style.display = 'none';
+  const fd = new FormData();
+  fd.append('archivo', file);
+  try {
+    const r = await fetch('/api/facturas/parsear', { method: 'POST', body: fd });
+    const data = await r.json();
+    document.getElementById('loading-parseo').style.display = 'none';
+    if (!r.ok || data.error) { mostrarError(data.error || 'Error al parsear'); dropZone.style.display = 'block'; return; }
+    parsedData = data;
+    productosDB = data.productos;
+    renderPreview(data);
+  } catch(e) {
+    document.getElementById('loading-parseo').style.display = 'none';
+    mostrarError('Error de conexión: ' + e.message);
+    dropZone.style.display = 'block';
+  }
+}
+
+// ── RENDER PREVIEW ─────────────────────────────────────────────────────────
+function fmt(n) {
+  return (n || 0).toLocaleString('es-CL');
+}
+
+function renderPreview(data) {
+  document.getElementById('zone-upload').style.display = 'none';
+  document.getElementById('zone-preview').style.display = 'block';
+  setStep(2);
+
+  // Meta
+  const meta = data.meta;
+  const metaGrid = document.getElementById('meta-grid');
+  metaGrid.innerHTML = `
+    <div class="meta-card"><label>N° Factura</label><input id="m-numero" value="${meta.numero}"></div>
+    <div class="meta-card"><label>Proveedor</label><input id="m-proveedor" value="${meta.proveedor}" style="font-size:.82rem"></div>
+    <div class="meta-card"><label>Fecha</label><input id="m-fecha" value="${meta.fecha}"></div>
+    <div class="meta-card"><label>Monto Neto</label><div class="val monto">$${fmt(meta.neto)}</div></div>
+    <div class="meta-card"><label>IVA 19%</label><div class="val">$${fmt(meta.iva)}</div></div>
+    <div class="meta-card"><label>Total</label><div class="val monto">$${fmt(meta.total)}</div></div>
+  `;
+
+  // Tabla
+  const tbody = document.getElementById('tbody-preview');
+  tbody.innerHTML = '';
+  let matchOk = 0, matchNo = 0;
+
+  data.rows.forEach((row, i) => {
+    const score = row.match_score;
+    let dotColor = score >= 0.8 ? 'dot-green' : score >= 0.3 ? 'dot-yellow' : 'dot-red';
+    if (score >= 0.3) matchOk++; else matchNo++;
+
+    const opts = productosDB.map(p =>
+      `<option value="${p.id}" ${p.id == row.producto_id ? 'selected' : ''}>${p.nombre}</option>`
+    ).join('');
+
+    const tr = document.createElement('tr');
+    tr.id = `fila-${i}`;
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td><b style="color:#fff">${row.nombre_factura}</b></td>
+      <td><input type="number" id="cant-${i}" value="${row.cantidad}" min="1" style="width:68px" oninput="actualizarInfo()"></td>
+      <td class="td-num">$${fmt(row.precio_unit)}</td>
+      <td class="td-num">$${fmt(row.valor)}</td>
+      <td>
+        <span class="match-dot ${dotColor}"></span>
+        <select id="prod-${i}">
+          <option value="">— Sin asignar —</option>
+          ${opts}
+        </select>
+      </td>
+      <td>
+        <button class="skip-btn" id="skip-${i}" onclick="toggleSkip(${i})" title="Saltar esta fila">✕</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('badge-match').innerHTML =
+    `<span class="badge-ok">✅ ${matchOk} producto${matchOk!=1?'s':''} reconocido${matchOk!=1?'s':''}</span>`;
+  if (matchNo > 0)
+    document.getElementById('badge-nomatch').innerHTML =
+      `<span class="badge-warn">⚠️ ${matchNo} sin asignar</span>`;
+
+  actualizarInfo();
+}
+
+function toggleSkip(i) {
+  const fila = document.getElementById(`fila-${i}`);
+  const btn  = document.getElementById(`skip-${i}`);
+  const skip = fila.classList.toggle('fila-skip');
+  btn.classList.toggle('skipped', skip);
+  btn.textContent = skip ? '↩' : '✕';
+  actualizarInfo();
+}
+
+function actualizarInfo() {
+  const rows = parsedData?.rows || [];
+  let activos = 0, asignados = 0;
+  rows.forEach((_, i) => {
+    const fila = document.getElementById(`fila-${i}`);
+    if (fila && !fila.classList.contains('fila-skip')) {
+      activos++;
+      const sel = document.getElementById(`prod-${i}`);
+      if (sel && sel.value) asignados++;
+    }
+  });
+  document.getElementById('info-sel').textContent =
+    `${asignados} de ${activos} ítems asignados`;
+  document.getElementById('btn-confirmar').disabled = (asignados === 0);
+}
+
+// ── CONFIRMAR ──────────────────────────────────────────────────────────────
+async function confirmar() {
+  const btn = document.getElementById('btn-confirmar');
+  btn.disabled = true;
+  btn.textContent = '⏳ Registrando…';
+
+  const meta = {
+    numero:    document.getElementById('m-numero')?.value || parsedData.meta.numero,
+    proveedor: document.getElementById('m-proveedor')?.value || parsedData.meta.proveedor,
+    fecha:     document.getElementById('m-fecha')?.value || parsedData.meta.fecha,
+    neto:      parsedData.meta.neto,
+    iva:       parsedData.meta.iva,
+    total:     parsedData.meta.total,
+  };
+
+  const rows = [];
+  (parsedData.rows || []).forEach((_, i) => {
+    const fila = document.getElementById(`fila-${i}`);
+    if (!fila || fila.classList.contains('fila-skip')) return;
+    const pid  = document.getElementById(`prod-${i}`)?.value;
+    const cant = parseInt(document.getElementById(`cant-${i}`)?.value) || 0;
+    if (pid && cant > 0) rows.push({ producto_id: parseInt(pid), cantidad: cant });
+  });
+
+  if (!rows.length) { mostrarError('No hay ítems válidos para registrar.'); btn.disabled=false; btn.textContent='✅ Registrar entradas'; return; }
+
+  try {
+    const r = await fetch('/api/facturas/procesar', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ meta, rows })
+    });
+    const data = await r.json();
+    btn.textContent = '✅ Registrar entradas';
+    if (!r.ok || data.error) { mostrarError(data.error); btn.disabled=false; return; }
+    mostrarResumenFinal(data.procesados, meta);
+  } catch(e) {
+    mostrarError('Error: ' + e.message);
+    btn.disabled = false; btn.textContent = '✅ Registrar entradas';
+  }
+}
+
+function mostrarResumenFinal(n, meta) {
+  document.getElementById('zone-preview').style.display = 'none';
+  setStep(3);
+  const zone = document.getElementById('zone-upload');
+  zone.style.display = 'block';
+  zone.innerHTML = `
+    <div class="resumen-final">
+      <div class="num">+${n}</div>
+      <p>entrada${n!=1?'s':''} registrada${n!=1?'s':''} desde Factura N°${meta.numero}</p>
+      <p style="margin-top:8px;color:#a0c0a8">${meta.proveedor} · ${meta.fecha}</p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px">
+        <button class="btn-nuevo" onclick="location.reload()">📄 Importar otra factura</button>
+        <button class="btn-nuevo" style="background:var(--verde)" onclick="location='/'">🏠 Ir al inventario</button>
+        </div>
+    </div>
+  `;
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById(`step${i}`);
+    el.classList.remove('active','done');
+    if (i < n) el.classList.add('done');
+    else if (i === n) el.classList.add('active');
+  });
+}
+
+function resetear() {
+  document.getElementById('zone-upload').style.display = 'block';
+  document.getElementById('zone-preview').style.display = 'none';
+  document.getElementById('loading-parseo').style.display = 'none';
+  document.getElementById('drop-zone').style.display = 'block';
+  document.getElementById('input-pdf').value = '';
+  parsedData = null;
+  setStep(1);
+}
+</script>
+</body>
+</html>
