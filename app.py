@@ -74,6 +74,12 @@ def init_db():
         id {PK}, nombre TEXT, email TEXT UNIQUE,
         password TEXT, rol TEXT DEFAULT 'edificio', edificio TEXT
     )''')
+    cur.execute(f'''CREATE TABLE IF NOT EXISTS guias_entrada (
+        id {PK}, guia_id TEXT, fecha TEXT,
+        proveedor TEXT, observacion TEXT, usuario TEXT,
+        total_neto INTEGER DEFAULT 0, total_iva INTEGER DEFAULT 0, total INTEGER DEFAULT 0,
+        origen TEXT DEFAULT 'manual', items_json TEXT, created_at {TS}
+    )''')
     if mode == 'pg':
         admin_email = os.environ.get('ADMIN_EMAIL','bodega@colegio.cl')
         admin_pass  = os.environ.get('ADMIN_PASS','bodega2025')
@@ -1277,7 +1283,172 @@ def procesar_factura():
     finally:
         conn2.close()
 
+    # ── Registrar en guias_entrada ──────────────────────────────────────────
+    if procesados > 0:
+        import json as _json
+        items_list = []
+        for row in rows:
+            pid = row.get('producto_id')
+            cant = int(row.get('cantidad', 0))
+            if not pid or cant <= 0:
+                continue
+            nombre_prod = row.get('nombre_factura', row.get('nombre', ''))
+            items_list.append({
+                'nombre': nombre_prod,
+                'cantidad': cant,
+                'precio_unit': int(row.get('precio_unit', 0)),
+                'valor': int(row.get('valor', 0)),
+                'producto_id': pid
+            })
+        total_neto = meta.get('neto', 0) or sum(i['valor'] for i in items_list)
+        total_iva  = meta.get('iva', 0)
+        total_tot  = meta.get('total', 0) or (total_neto + total_iva)
+        guia_id = f"F-{num}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        conn3, mode3 = get_db()
+        cur3 = conn3.cursor()
+        try:
+            if mode3 == 'pg':
+                cur3.execute(
+                    "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (guia_id, fecha_mov, proveedor, f"Factura N°{num}", session['user'], total_neto, total_iva, total_tot, 'factura', _json.dumps(items_list, ensure_ascii=False)))
+            else:
+                cur3.execute(
+                    "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (guia_id, fecha_mov, proveedor, f"Factura N°{num}", session['user'], total_neto, total_iva, total_tot, 'factura', _json.dumps(items_list, ensure_ascii=False)))
+            conn3.commit()
+        except Exception:
+            pass
+        finally:
+            conn3.close()
+
     return jsonify({'ok': True, 'procesados': procesados, 'errores': errores})
+
+
+# ── GUIAS ENTRADA API ─────────────────────────────────────────────────────────
+@app.route('/api/guias_entrada', methods=['GET'])
+@login_required
+def get_guias_entrada():
+    import json as _json
+    rows = db_fetchall("SELECT id,guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json,created_at FROM guias_entrada ORDER BY id DESC LIMIT 100")
+    result = []
+    for r in rows:
+        items = []
+        try:
+            items = _json.loads(r.get('items_json') or '[]')
+        except Exception:
+            pass
+        result.append({
+            'id': r.get('id'), 'guia_id': r.get('guia_id'), 'fecha': r.get('fecha'),
+            'proveedor': r.get('proveedor'), 'observacion': r.get('observacion'), 'usuario': r.get('usuario'),
+            'total_neto': r.get('total_neto'), 'total_iva': r.get('total_iva'), 'total': r.get('total'),
+            'origen': r.get('origen'), 'items': items, 'created_at': str(r.get('created_at',''))
+        })
+    return jsonify(result)
+
+
+@app.route('/api/guias_entrada', methods=['POST'])
+@login_required
+def post_guia_entrada():
+    import json as _json
+    d = request.json
+    fecha     = d.get('fecha', datetime.now().strftime('%d-%m-%Y'))
+    proveedor = d.get('proveedor', '').strip()
+    obs       = d.get('observacion', '').strip()
+    items     = d.get('items', [])
+    guia_id   = f"GE-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+    conn2, mode2 = get_db()
+    cur2 = conn2.cursor()
+    procesados = 0
+    errores = []
+    try:
+        for item in items:
+            pid  = item.get('producto_id')
+            cant = int(item.get('cantidad', 0))
+            if not pid or cant <= 0:
+                continue
+            obs_mov = f"[Guía {guia_id} | {proveedor}]"
+            try:
+                if mode2 == 'pg':
+                    cur2.execute(
+                        "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                        (pid, 'entrada', cant, '', session['user'], obs_mov, fecha))
+                    cur2.execute("UPDATE productos SET stock_actual=stock_actual+%s WHERE id=%s", (cant, pid))
+                else:
+                    cur2.execute(
+                        "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (?,?,?,?,?,?,?)",
+                        (pid, 'entrada', cant, '', session['user'], obs_mov, fecha))
+                    cur2.execute("UPDATE productos SET stock_actual=stock_actual+? WHERE id=?", (cant, pid))
+                procesados += 1
+            except Exception as e2:
+                errores.append(str(e2))
+
+        total_neto = sum(int(i.get('valor', 0)) for i in items)
+        total_iva  = round(total_neto * 0.19)
+        total_tot  = total_neto + total_iva
+        if mode2 == 'pg':
+            cur2.execute(
+                "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (guia_id, fecha, proveedor, obs, session['user'], total_neto, total_iva, total_tot, 'manual', _json.dumps(items, ensure_ascii=False)))
+        else:
+            cur2.execute(
+                "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (guia_id, fecha, proveedor, obs, session['user'], total_neto, total_iva, total_tot, 'manual', _json.dumps(items, ensure_ascii=False)))
+        conn2.commit()
+    finally:
+        conn2.close()
+
+    return jsonify({'ok': True, 'guia_id': guia_id, 'procesados': procesados, 'errores': errores})
+
+
+@app.route('/api/guias_entrada/<int:gid>', methods=['DELETE'])
+@admin_required
+def delete_guia_entrada(gid):
+    import json as _json
+    guia = db_fetchone("SELECT items_json, origen FROM guias_entrada WHERE id=?", (gid,))
+    if not guia:
+        return jsonify({'error': 'No encontrada'}), 404
+    items_json, origen = guia.get('items_json'), guia.get('origen', 'manual')
+    # Si es manual, revertir stock
+    if origen == 'manual':
+        items = []
+        try:
+            items = _json.loads(items_json) if items_json else []
+        except Exception:
+            pass
+        conn2, mode2 = get_db()
+        cur2 = conn2.cursor()
+        try:
+            for item in items:
+                pid  = item.get('producto_id')
+                cant = int(item.get('cantidad', 0))
+                if not pid or cant <= 0:
+                    continue
+                if mode2 == 'pg':
+                    cur2.execute("UPDATE productos SET stock_actual=GREATEST(0,stock_actual-%s) WHERE id=%s", (cant, pid))
+                else:
+                    cur2.execute("UPDATE productos SET stock_actual=MAX(0,stock_actual-?) WHERE id=?", (cant, pid))
+            if mode2 == 'pg':
+                cur2.execute("DELETE FROM guias_entrada WHERE id=%s", (gid,))
+            else:
+                cur2.execute("DELETE FROM guias_entrada WHERE id=?", (gid,))
+            conn2.commit()
+        finally:
+            conn2.close()
+    else:
+        # Solo eliminar registro, no revertir (facturas ya procesadas)
+        conn2, mode2 = get_db()
+        cur2 = conn2.cursor()
+        try:
+            if mode2 == 'pg':
+                cur2.execute("DELETE FROM guias_entrada WHERE id=%s", (gid,))
+            else:
+                cur2.execute("DELETE FROM guias_entrada WHERE id=?", (gid,))
+            conn2.commit()
+        finally:
+            conn2.close()
+
+    return jsonify({'ok': True})
 
 
 if __name__=='__main__':
