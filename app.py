@@ -1077,6 +1077,231 @@ def export_reposicion():
                      as_attachment=True,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
+# ── FACTURAS ──────────────────────────────────────────────────────────────────
+@app.route('/facturas')
+@admin_required
+def facturas_page():
+    return render_template('facturas.html', user=session['user'], rol=session['rol'])
+
+@app.route('/api/facturas/parsear', methods=['POST'])
+@admin_required
+def parsear_factura():
+    if 'archivo' not in request.files:
+        return jsonify({'error': 'No se envió archivo'}), 400
+    file = request.files['archivo']
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({'error': 'Solo se aceptan archivos PDF'}), 400
+    try:
+        try:
+            import pdfplumber
+        except ImportError:
+            import subprocess, sys
+            subprocess.run([sys.executable, '-m', 'pip', 'install', 'pdfplumber', '--break-system-packages', '-q'])
+            import pdfplumber
+
+        pdf_bytes = file.read()
+        rows_parsed = []
+        meta = {'numero': '', 'proveedor': '', 'fecha': '', 'neto': 0, 'iva': 0, 'total': 0}
+
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            page = pdf.pages[0]
+            text = page.extract_text() or ''
+            lines = [l.strip() for l in text.split('\n') if l.strip()]
+
+            import re
+            # N° factura
+            m = re.search(r'N[°oº]?\s*(\d+)', text, re.IGNORECASE)
+            if m: meta['numero'] = m.group(1)
+
+            # Fecha (08 de Junio del 2026)
+            meses_map = {'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06',
+                         'julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12'}
+            m = re.search(r'(\d{1,2})\s+de\s+(\w+)\s+del?\s+(\d{4})', text, re.IGNORECASE)
+            if m:
+                d2, mon, y2 = m.group(1), m.group(2).lower(), m.group(3)
+                meta['fecha'] = f"{d2.zfill(2)}-{meses_map.get(mon,'01')}-{y2}"
+            else:
+                # fallback: dd-mm-yyyy
+                m = re.search(r'(\d{2})[/-](\d{2})[/-](\d{4})', text)
+                if m: meta['fecha'] = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+
+            # Proveedor: primera linea que no sea RUT ni vacia
+            skip_kw = ['R.U.T','RUT:','SEÑOR','GIRO','DIRECC','COMUN','TIPO','FACTURA','SII']
+            for ln in lines[:15]:
+                if len(ln) > 5 and not any(kw in ln.upper() for kw in skip_kw):
+                    meta['proveedor'] = ln
+                    break
+
+            # Totales desde texto
+            def parse_monto(pattern):
+                m2 = re.search(pattern, text, re.IGNORECASE)
+                if m2:
+                    v = m2.group(1).replace('.','').replace(',','').strip()
+                    try: return int(v)
+                    except: return 0
+                return 0
+            meta['neto']  = parse_monto(r'MONTO NETO\s*\$?\s*([\d.,]+)')
+            meta['iva']   = parse_monto(r'I\.?V\.?A\.?[^$\n]*\$?\s*([\d.,]+)')
+            meta['total'] = parse_monto(r'TOTAL\s*\$?\s*([\d.,]+)')
+
+            # Extraer tabla de productos
+            tables = page.extract_tables({'vertical_strategy':'lines','horizontal_strategy':'lines'})
+            if not tables:
+                tables = page.extract_tables()
+
+            for table in (tables or []):
+                header_found = False
+                for row in table:
+                    if not row: continue
+                    cells = [str(c or '').strip() for c in row]
+                    # Detectar fila de encabezado
+                    row_text = ' '.join(cells).upper()
+                    if any(h in row_text for h in ['DESCRIPCION','DESCRIPCIÓN','CANTIDAD','CODIGO']):
+                        header_found = True
+                        continue
+                    if not header_found: continue
+                    # Saltar filas vacias o de totales
+                    if len([c for c in cells if c and c not in ['-','None']]) < 2: continue
+                    if any(kw in row_text for kw in ['NETO','I.V.A','IVA','TOTAL','FORMA DE PAGO','TIMBRE']): continue
+
+                    # Buscar descripcion (columna con texto largo)
+                    nombre = ''
+                    for c in cells:
+                        if c and len(c) > 3 and not re.match(r'^[\d.,\-]+$', c) and c not in ['-']:
+                            nombre = c
+                            break
+                    if not nombre: continue
+
+                    # Buscar cantidad y precio (numeros en las columnas siguientes)
+                    numeros = []
+                    for c in cells:
+                        c2 = c.replace('.','').replace(',','.').strip()
+                        try:
+                            v2 = float(c2)
+                            if v2 > 0 and c2 != nombre:
+                                numeros.append(int(v2))
+                        except: pass
+
+                    cant = numeros[0] if len(numeros) >= 1 else 0
+                    precio = numeros[1] if len(numeros) >= 2 else 0
+                    valor = numeros[-1] if len(numeros) >= 2 else 0
+
+                    if nombre and cant > 0:
+                        rows_parsed.append({
+                            'nombre_factura': nombre,
+                            'cantidad': cant,
+                            'precio_unit': precio,
+                            'valor': valor,
+                        })
+
+        # Si no se encontraron filas con tablas, intentar parse por texto
+        if not rows_parsed:
+            import re
+            # Buscar lineas que parezcan productos: TEXTO NUMERO NUMERO NUMERO
+            pat = re.compile(r'^(.+?)\s{2,}(\d[\d.]*)\s{2,}([\d.]+)\s{2,}([\d.]+)\s*$')
+            for ln in lines:
+                m2 = pat.match(ln)
+                if m2:
+                    nombre = m2.group(1).strip()
+                    skip_kw2 = ['NETO','IVA','TOTAL','FORMA','TIMBRE','CODIGO','DESCRIPCION']
+                    if any(kw in nombre.upper() for kw in skip_kw2): continue
+                    try:
+                        cant = int(m2.group(2).replace('.',''))
+                        precio = int(m2.group(3).replace('.',''))
+                        valor = int(m2.group(4).replace('.',''))
+                        if cant > 0:
+                            rows_parsed.append({'nombre_factura': nombre, 'cantidad': cant,
+                                                'precio_unit': precio, 'valor': valor})
+                    except: pass
+
+        # Obtener productos de bodega para matching
+        productos = db_fetchall(
+            "SELECT id, nombre, categoria, unidad FROM productos WHERE activo=TRUE ORDER BY nombre")
+
+        def normalizar(s):
+            import unicodedata
+            s = s.lower().strip()
+            s = unicodedata.normalize('NFD', s)
+            s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+            return s
+
+        for row in rows_parsed:
+            nf = normalizar(row['nombre_factura'])
+            best_match = None
+            best_score = 0.0
+            for p in productos:
+                np = normalizar(p['nombre'])
+                if nf == np:
+                    score = 1.0
+                elif nf in np or np in nf:
+                    score = 0.85
+                else:
+                    wf = set(nf.split())
+                    wp = set(np.split())
+                    overlap = len(wf & wp)
+                    score = (overlap / max(len(wf), len(wp))) * 0.7 if overlap else 0
+                if score > best_score:
+                    best_score = score
+                    best_match = p
+            if best_match and best_score >= 0.3:
+                row['producto_id'] = best_match['id']
+                row['producto_nombre'] = best_match['nombre']
+                row['match_score'] = round(best_score, 2)
+            else:
+                row['producto_id'] = None
+                row['producto_nombre'] = ''
+                row['match_score'] = 0.0
+
+        return jsonify({'ok': True, 'meta': meta, 'rows': rows_parsed, 'productos': productos})
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'detalle': traceback.format_exc()}), 500
+
+@app.route('/api/facturas/procesar', methods=['POST'])
+@admin_required
+def procesar_factura():
+    d = request.json
+    meta = d.get('meta', {})
+    rows = d.get('rows', [])
+    fecha_mov = meta.get('fecha') or datetime.now().strftime('%d-%m-%Y')
+    num = meta.get('numero', '?')
+    proveedor = meta.get('proveedor', '')
+    obs_base = f"[Factura N°{num} | {proveedor}]"
+
+    procesados = 0
+    errores = []
+    conn2, mode2 = get_db()
+    cur2 = conn2.cursor()
+    try:
+        for row in rows:
+            pid  = row.get('producto_id')
+            cant = int(row.get('cantidad', 0))
+            if not pid or cant <= 0:
+                continue
+            try:
+                if mode2 == 'pg':
+                    cur2.execute(
+                        "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                        (pid, 'entrada', cant, '', session['user'], obs_base, fecha_mov))
+                    cur2.execute(
+                        "UPDATE productos SET stock_actual=stock_actual+%s WHERE id=%s", (cant, pid))
+                else:
+                    cur2.execute(
+                        "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (?,?,?,?,?,?,?)",
+                        (pid, 'entrada', cant, '', session['user'], obs_base, fecha_mov))
+                    cur2.execute(
+                        "UPDATE productos SET stock_actual=stock_actual+? WHERE id=?", (cant, pid))
+                procesados += 1
+            except Exception as e2:
+                errores.append(str(e2))
+
+        conn2.commit()
+    finally:
+        conn2.close()
+
+    return jsonify({'ok': True, 'procesados': procesados, 'errores': errores})
+
+
 if __name__=='__main__':
     init_db()
     app.run(debug=False,host='0.0.0.0',port=int(os.environ.get('PORT',5000)))
