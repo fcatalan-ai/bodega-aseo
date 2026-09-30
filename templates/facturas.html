@@ -96,6 +96,25 @@ h1{font-size:1.3rem;font-weight:700;margin-bottom:4px;color:#fff}
 .ac-option:hover,.ac-option.focused{background:#27ae7330;color:#fff}
 .ac-option .ac-cat{font-size:.7rem;color:#6a9a7a;margin-left:6px}
 .ac-none{padding:8px 11px;color:#6a9a7a;font-size:.8rem;font-style:italic}
+.ac-create{padding:8px 11px;cursor:pointer;font-size:.8rem;color:#c9a0ff;border-top:1px solid #2a5040;display:flex;align-items:center;gap:6px}
+.ac-create:hover{background:#3a1a5530;color:#e0c0ff}
+
+/* MODAL CREAR PRODUCTO */
+.modal-bg{display:none;position:fixed;inset:0;background:#0009;z-index:2000;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#162d22;border:1px solid #2a5040;border-radius:14px;padding:24px;width:100%;max-width:420px;box-shadow:0 12px 40px #0009}
+.modal h3{font-size:1rem;font-weight:700;color:#fff;margin-bottom:4px}
+.modal .modal-sub{font-size:.8rem;color:var(--texto2);margin-bottom:18px}
+.modal-grid{display:grid;gap:12px}
+.modal label{font-size:.73rem;color:var(--texto2);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px}
+.modal input,.modal select{width:100%;background:var(--fondo);border:1px solid var(--borde);color:#fff;border-radius:7px;padding:8px 10px;font-size:.88rem;outline:none}
+.modal input:focus,.modal select:focus{border-color:#98e6b0}
+.modal-actions{display:flex;gap:10px;margin-top:18px}
+.btn-modal-ok{flex:1;background:var(--verde3);color:#fff;border:none;padding:9px;border-radius:8px;font-size:.9rem;font-weight:700;cursor:pointer}
+.btn-modal-ok:hover{background:#2ecc71}
+.btn-modal-ok:disabled{background:#2a5a3a;color:#6a9a7a;cursor:not-allowed}
+.btn-modal-cancel{background:none;border:1px solid #444;color:#aaa;padding:9px 16px;border-radius:8px;cursor:pointer;font-size:.88rem}
+.btn-modal-cancel:hover{border-color:#777;color:#fff}
 .dot-green{background:#27ae73}
 .dot-yellow{background:#f1c40f}
 .dot-red{background:#e74c3c}
@@ -220,6 +239,44 @@ tr.fila-skip input,tr.fila-skip .ac-input{pointer-events:none}
     </div>
   </div>
 
+</div>
+
+<!-- MODAL CREAR PRODUCTO -->
+<div class="modal-bg" id="modal-crear">
+  <div class="modal">
+    <h3>➕ Crear nuevo producto</h3>
+    <p class="modal-sub">El producto se agregará al inventario de bodega y quedará asignado a esta fila.</p>
+    <div class="modal-grid">
+      <div>
+        <label>Nombre del producto *</label>
+        <input id="mnp-nombre" type="text" placeholder="Ej: Pastilla WC c/gancho">
+      </div>
+      <div>
+        <label>Categoría</label>
+        <input id="mnp-categoria" type="text" list="mnp-cats-list" placeholder="Ej: Aseo, Limpieza…">
+        <datalist id="mnp-cats-list"></datalist>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label>Unidad</label>
+          <input id="mnp-unidad" type="text" list="mnp-units-list" placeholder="unidades">
+          <datalist id="mnp-units-list">
+            <option>unidades</option><option>litros</option><option>kilos</option>
+            <option>cajas</option><option>paquetes</option><option>bolsas</option>
+            <option>rollos</option><option>pares</option>
+          </datalist>
+        </div>
+        <div>
+          <label>Stock mínimo</label>
+          <input id="mnp-stockmin" type="number" min="0" value="0" placeholder="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="cerrarModalCrear()">Cancelar</button>
+      <button class="btn-modal-ok" id="btn-modal-ok" onclick="crearProductoNuevo()">✅ Crear y asignar</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -399,10 +456,11 @@ function acBuildDropdown(idx, query) {
   const matches = productosDB.filter(p => normalizeAC(p.nombre).includes(q));
   acFocused[idx] = -1;
 
-  if (!matches.length) {
-    drop.innerHTML = `<div class="ac-none">Sin resultados para "${query}"</div>`;
+  let html = '';
+  if (!matches.length && q) {
+    html += `<div class="ac-none">Sin resultados para "<b>${query}</b>"</div>`;
   } else {
-    drop.innerHTML = matches.map((p, mi) =>
+    html += matches.map((p, mi) =>
       `<div class="ac-option" data-id="${p.id}" data-nombre="${p.nombre.replace(/"/g,'&quot;')}" data-mi="${mi}"
             onmousedown="acSelect(event,${idx})"
             onmouseover="acHover(${idx},${mi})">
@@ -410,6 +468,12 @@ function acBuildDropdown(idx, query) {
       </div>`
     ).join('');
   }
+  // Siempre mostrar opción de crear si hay texto
+  const textoCrear = (query || '').trim();
+  html += `<div class="ac-create" onmousedown="abrirModalCrear(event,${idx},'${textoCrear.replace(/'/g,"\\'")}')">
+    ➕ Crear producto "${textoCrear || '…'}"
+  </div>`;
+  drop.innerHTML = html;
   drop.classList.add('open');
 }
 
@@ -486,6 +550,86 @@ function acBlur(idx) {
       else { inp.value = ''; inp.classList.add('unassigned'); }
     }
   }, 150);
+}
+
+// ── MODAL CREAR PRODUCTO ───────────────────────────────────────────────────
+let modalTargetIdx = null;
+
+function abrirModalCrear(e, idx, texto) {
+  e.preventDefault();
+  modalTargetIdx = idx;
+  document.getElementById('ac-drop-' + idx).classList.remove('open');
+  document.getElementById('mnp-nombre').value = texto || '';
+  document.getElementById('mnp-categoria').value = '';
+  document.getElementById('mnp-unidad').value = 'unidades';
+  document.getElementById('mnp-stockmin').value = '0';
+
+  // Poblar datalist de categorías con las existentes en bodega
+  const cats = [...new Set(productosDB.map(p => p.categoria).filter(Boolean))].sort();
+  document.getElementById('mnp-cats-list').innerHTML =
+    cats.map(c => `<option>${c}</option>`).join('');
+
+  document.getElementById('modal-crear').classList.add('open');
+  setTimeout(() => document.getElementById('mnp-nombre').focus(), 80);
+}
+
+function cerrarModalCrear() {
+  document.getElementById('modal-crear').classList.remove('open');
+  modalTargetIdx = null;
+}
+
+// Cerrar modal con Escape o click en fondo
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') cerrarModalCrear();
+});
+document.getElementById('modal-crear').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModalCrear();
+});
+
+async function crearProductoNuevo() {
+  const nombre = document.getElementById('mnp-nombre').value.trim();
+  if (!nombre) { document.getElementById('mnp-nombre').focus(); return; }
+
+  const btn = document.getElementById('btn-modal-ok');
+  btn.disabled = true; btn.textContent = '⏳ Creando…';
+
+  const payload = {
+    nombre,
+    categoria: document.getElementById('mnp-categoria').value.trim() || 'Varios',
+    unidad:    document.getElementById('mnp-unidad').value.trim() || 'unidades',
+    stock_actual: 0,
+    stock_minimo: parseInt(document.getElementById('mnp-stockmin').value) || 0,
+  };
+
+  try {
+    const r = await fetch('/api/productos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    btn.disabled = false; btn.textContent = '✅ Crear y asignar';
+
+    if (!r.ok || !data.ok) {
+      mostrarError('Error al crear producto: ' + (data.error || r.status));
+      return;
+    }
+
+    // Agregar a lista local y asignar a la fila
+    const nuevo = { id: data.id, nombre: payload.nombre,
+                    categoria: payload.categoria, unidad: payload.unidad };
+    productosDB.push(nuevo);
+    productosDB.sort((a,b) => a.nombre.localeCompare(b.nombre));
+
+    cerrarModalCrear();
+    if (modalTargetIdx !== null) {
+      acSetValue(modalTargetIdx, String(data.id), payload.nombre);
+    }
+    mostrarOk(`Producto "${payload.nombre}" creado y asignado.`);
+  } catch(err) {
+    btn.disabled = false; btn.textContent = '✅ Crear y asignar';
+    mostrarError('Error de conexión: ' + err.message);
+  }
 }
 
 function acKey(e, idx) {
