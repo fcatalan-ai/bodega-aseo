@@ -166,6 +166,35 @@ def _backfill_guias_desde_movimientos():
                     "VALUES (?,?,?,?,?,?,?,?,?,?)",
                     (guia_id, g['fecha'], g['proveedor'], f"Factura N°{g['num']}", g['usuario'],
                      0, 0, 0, 'factura', items_json))
+        # Reparar items_json existentes con nombres vacíos
+        if mode == 'pg':
+            cur.execute("SELECT id, items_json FROM guias_entrada WHERE items_json IS NOT NULL")
+        else:
+            cur.execute("SELECT id, items_json FROM guias_entrada WHERE items_json IS NOT NULL")
+        all_guias = cur.fetchall()
+        for grow in all_guias:
+            gid_val = grow[0]
+            try:
+                items_raw = _json.loads(grow[1] or '[]')
+            except Exception:
+                continue
+            changed = False
+            for item in items_raw:
+                if (not item.get('nombre') or item['nombre'] == '—') and item.get('producto_id'):
+                    if mode == 'pg':
+                        cur.execute("SELECT nombre FROM productos WHERE id=%s", (int(item['producto_id']),))
+                    else:
+                        cur.execute("SELECT nombre FROM productos WHERE id=?", (int(item['producto_id']),))
+                    prow = cur.fetchone()
+                    if prow:
+                        item['nombre'] = prow[0]
+                        changed = True
+            if changed:
+                new_json = _json.dumps(items_raw, ensure_ascii=False)
+                if mode == 'pg':
+                    cur.execute("UPDATE guias_entrada SET items_json=%s WHERE id=%s", (new_json, gid_val))
+                else:
+                    cur.execute("UPDATE guias_entrada SET items_json=? WHERE id=?", (new_json, gid_val))
         conn.commit()
     except Exception as e:
         print(f'[backfill] Error: {e}')
@@ -1368,7 +1397,12 @@ def procesar_factura():
             cant = int(row.get('cantidad', 0))
             if not pid or cant <= 0:
                 continue
-            nombre_prod = row.get('nombre_factura', row.get('nombre', ''))
+            nombre_prod = row.get('nombre_factura', row.get('nombre', '')) or ''
+            # Si no viene nombre desde el PDF, buscar en la tabla productos
+            if not nombre_prod and pid:
+                p = db_fetchone("SELECT nombre FROM productos WHERE id=?", (int(pid),))
+                if p:
+                    nombre_prod = p.get('nombre', '')
             items_list.append({
                 'nombre': nombre_prod,
                 'cantidad': cant,
@@ -1405,6 +1439,15 @@ def procesar_factura():
 @login_required
 def get_guias_entrada():
     import json as _json
+    # Cache de nombres de productos para enriquecer items sin nombre
+    _prod_cache = {}
+    def _get_nombre(pid):
+        if not pid: return '—'
+        if pid not in _prod_cache:
+            p = db_fetchone("SELECT nombre FROM productos WHERE id=?", (int(pid),))
+            _prod_cache[pid] = p.get('nombre', '—') if p else '—'
+        return _prod_cache[pid]
+
     rows = db_fetchall("SELECT id,guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json,created_at FROM guias_entrada ORDER BY id DESC LIMIT 100")
     result = []
     for r in rows:
@@ -1413,6 +1456,10 @@ def get_guias_entrada():
             items = _json.loads(r.get('items_json') or '[]')
         except Exception:
             pass
+        # Enriquecer items: si nombre está vacío, buscar en productos
+        for item in items:
+            if not item.get('nombre') or item['nombre'] == '—':
+                item['nombre'] = _get_nombre(item.get('producto_id'))
         result.append({
             'id': r.get('id'), 'guia_id': r.get('guia_id'), 'fecha': r.get('fecha'),
             'proveedor': r.get('proveedor'), 'observacion': r.get('observacion'), 'usuario': r.get('usuario'),
