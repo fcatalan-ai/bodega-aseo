@@ -96,6 +96,81 @@ def init_db():
             (admin_pass, admin_email))
     conn.commit()
     conn.close()
+    # Backfill guias_entrada desde movimientos históricos de facturas
+    _backfill_guias_desde_movimientos()
+
+def _backfill_guias_desde_movimientos():
+    """
+    Lee movimientos con observacion '[Factura N°XXX | Proveedor]' que aún no
+    tienen su guia_entrada registrada y crea los registros faltantes.
+    Se ejecuta en cada inicio (idempotente: verifica guia_id antes de insertar).
+    """
+    import json as _json, re as _re
+    conn, mode = get_db()
+    cur = conn.cursor()
+    try:
+        # Traer todos los movimientos de tipo entrada con patrón factura
+        pat = '%[Factura N°%'
+        if mode == 'pg':
+            cur.execute(
+                "SELECT m.id, m.producto_id, m.cantidad, m.observacion, m.fecha, m.usuario, p.nombre "
+                "FROM movimientos m LEFT JOIN productos p ON p.id=m.producto_id "
+                "WHERE m.tipo='entrada' AND m.observacion LIKE %s ORDER BY m.id", (pat,))
+        else:
+            cur.execute(
+                "SELECT m.id, m.producto_id, m.cantidad, m.observacion, m.fecha, m.usuario, p.nombre "
+                "FROM movimientos m LEFT JOIN productos p ON p.id=m.producto_id "
+                "WHERE m.tipo='entrada' AND m.observacion LIKE ? ORDER BY m.id", (pat,))
+
+        rows = cur.fetchall()
+        # Agrupar por observacion (= una factura)
+        grupos = {}
+        for row in rows:
+            mid, pid, cant, obs, fecha, usuario, nombre_prod = row
+            m = _re.match(r'\[Factura N°(\S+)\s*\|\s*(.+?)\]', obs or '')
+            if not m:
+                continue
+            num_fac, proveedor = m.group(1).strip(), m.group(2).strip()
+            key = f"F-{num_fac}"
+            if key not in grupos:
+                grupos[key] = {'num': num_fac, 'proveedor': proveedor,
+                               'fecha': fecha, 'usuario': usuario or 'Bodega', 'items': []}
+            grupos[key]['items'].append({
+                'nombre': nombre_prod or f'Producto #{pid}',
+                'cantidad': cant,
+                'precio_unit': 0,
+                'valor': 0,
+                'producto_id': pid
+            })
+
+        # Insertar solo los que no existen ya
+        for key, g in grupos.items():
+            # Verificar si ya existe una guia con ese guia_id o que contenga ese número
+            if mode == 'pg':
+                cur.execute("SELECT 1 FROM guias_entrada WHERE guia_id LIKE %s LIMIT 1", (f"F-{g['num']}%",))
+            else:
+                cur.execute("SELECT 1 FROM guias_entrada WHERE guia_id LIKE ? LIMIT 1", (f"F-{g['num']}%",))
+            if cur.fetchone():
+                continue  # ya registrada
+            guia_id = f"F-{g['num']}-backfill"
+            items_json = _json.dumps(g['items'], ensure_ascii=False)
+            if mode == 'pg':
+                cur.execute(
+                    "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (guia_id, g['fecha'], g['proveedor'], f"Factura N°{g['num']}", g['usuario'],
+                     0, 0, 0, 'factura', items_json))
+            else:
+                cur.execute(
+                    "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (guia_id, g['fecha'], g['proveedor'], f"Factura N°{g['num']}", g['usuario'],
+                     0, 0, 0, 'factura', items_json))
+        conn.commit()
+    except Exception as e:
+        print(f'[backfill] Error: {e}')
+    finally:
+        conn.close()
 
 with app.app_context():
     init_db()
