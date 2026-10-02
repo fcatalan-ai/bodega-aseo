@@ -5,64 +5,74 @@
 <title>Orden de Reposición — Bodega Aseo</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
-.topbar{background:#0D4F3C;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
-.topbar h1{font-size:16px;font-weight:700}
-.topbar-links{display:flex;gap:14px;font-size:13px}
-.topbar-links a{color:#A8D5C5;text-decoration:none}
-.topbar-links a:hover{color:#fff}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF3F0;min-height:100vh;color:#1C2E26}
+.topbar{background:#0D4F3C;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:50;box-shadow:0 2px 10px rgba(0,0,0,0.18)}
+.topbar-logo{font-weight:700;font-size:15px;color:#fff;line-height:1.2;white-space:nowrap}
+.topbar-logo span{display:block;font-size:11px;color:#98D4BC;font-weight:400}
+.topbar-links{display:flex;gap:2px;align-items:center}
+.topbar-links a{color:#B2CEC4;text-decoration:none;font-size:13px;padding:6px 10px;border-radius:7px;transition:.15s;white-space:nowrap}
+.topbar-links a:hover{background:rgba(255,255,255,0.13);color:#fff}
+.topbar-links a.active{color:#fff;font-weight:600;background:rgba(255,255,255,0.15)}
+.topbar-right{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.topbar-right .user-pill{color:#98D4BC;font-size:12px}
+.btn-logout{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.22);padding:5px 14px;border-radius:7px;font-size:12px;cursor:pointer;transition:.15s}
+.btn-logout:hover{background:rgba(255,255,255,0.22)}
 .main{padding:20px;max-width:1100px;margin:0 auto}
 .header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
 .header-row h2{font-size:18px;font-weight:700;color:#0D4F3C}
-.header-row p{font-size:13px;color:#888;margin-top:4px}
+.header-row p{font-size:13px;color:#5E7B6E;margin-top:4px}
 .btn-export{background:#0D4F3C;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600}
 .btn-export:hover{background:#1a6b52}
-.alerta-banner{background:#FCEBEB;border:1px solid #fcc;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:14px;color:#C00}
+.alerta-banner{background:#FDECEA;border:1px solid #F5BCBC;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;font-size:14px;color:#9B1C1C}
 .alerta-banner strong{font-size:20px}
 .sec{font-size:11px;font-weight:700;color:#0D4F3C;text-transform:uppercase;letter-spacing:.05em;margin:20px 0 10px;border-left:4px solid #0D4F3C;padding-left:8px}
-.table-wrap{background:#fff;border-radius:10px;border:1px solid #e5e8ed;overflow:auto;margin-bottom:20px}
+.table-wrap{background:#fff;border-radius:12px;border:1px solid #D4E4DC;box-shadow:0 1px 4px rgba(13,79,60,0.06);overflow:auto;margin-bottom:20px}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:650px}
 th{background:#0D4F3C;color:#fff;padding:10px 14px;text-align:left;font-size:11px;font-weight:600}
-td{padding:10px 14px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+td{padding:10px 14px;border-bottom:1px solid #EEF3F0;vertical-align:middle;color:#1C2E26}
 tr:last-child td{border-bottom:none}
-tr:hover td{background:#f0f7f4}
+tr:hover td{background:#F0F7F3}
 .badge-cat{background:#E6F1FB;color:#0C447C;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
-.cant-sugerida{font-size:16px;font-weight:700;color:#C00;background:#FCEBEB;padding:4px 12px;border-radius:20px;display:inline-block}
-.cant-agotado{font-size:16px;font-weight:700;color:#7F0000;background:#FFB3B3;padding:4px 12px;border-radius:20px;display:inline-block}
-.stock-cero{color:#C00;font-weight:700}
+.cant-sugerida{font-size:16px;font-weight:700;color:#9B1C1C;background:#FDECEA;padding:4px 12px;border-radius:20px;display:inline-block}
+.cant-agotado{font-size:16px;font-weight:700;color:#7F0000;background:#F5BCBC;padding:4px 12px;border-radius:20px;display:inline-block}
+.stock-cero{color:#9B1C1C;font-weight:700}
 .progress-wrap{display:flex;align-items:center;gap:8px}
-.progress-bg{background:#eee;border-radius:10px;height:8px;width:80px;overflow:hidden;flex-shrink:0}
-.progress-fill{height:100%;border-radius:10px;background:#C00}
-.loading{text-align:center;padding:40px;color:#999}
+.progress-bg{background:#D4E4DC;border-radius:10px;height:8px;width:80px;overflow:hidden;flex-shrink:0}
+.progress-fill{height:100%;border-radius:10px;background:#9B1C1C}
+.loading{text-align:center;padding:40px;color:#5E7B6E}
 .empty{text-align:center;padding:40px;color:#27500A;font-size:15px}
 /* SEMANA */
 .semana-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
 @media(max-width:700px){.semana-grid{grid-template-columns:1fr}}
-.semana-card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;overflow:hidden}
+.semana-card{background:#fff;border-radius:12px;border:1px solid #D4E4DC;box-shadow:0 1px 4px rgba(13,79,60,0.06);overflow:hidden}
 .semana-head{padding:12px 16px;font-weight:700;font-size:13px;display:flex;justify-content:space-between;align-items:center}
-.semana-head.actual{background:#E2EFDA;color:#27500A}
-.semana-head.anterior{background:#f0f4f8;color:#555}
-.semana-ed{padding:8px 16px;border-bottom:1px solid #f0f0f0;font-size:12px}
+.semana-head.actual{background:#D4EDDB;color:#1A5C32}
+.semana-head.anterior{background:#EEF3F0;color:#5E7B6E}
+.semana-ed{padding:8px 16px;border-bottom:1px solid #EEF3F0;font-size:12px}
 .semana-ed:last-child{border-bottom:none}
 .semana-ed-name{font-weight:700;color:#0D4F3C;margin-bottom:4px}
-.semana-prod{display:flex;justify-content:space-between;font-size:11px;color:#666;padding:2px 0}
+.semana-prod{display:flex;justify-content:space-between;font-size:11px;color:#5E7B6E;padding:2px 0}
 .semana-total{font-size:12px;font-weight:700;color:#0D4F3C}
 .delta{font-size:11px;font-weight:600}
-.delta-up{color:#C00}
-.delta-dn{color:#27500A}
+.delta-up{color:#9B1C1C}
+.delta-dn{color:#1A5C32}
 </style>
 </head>
 <body>
 <div class="topbar">
-  <h1>🧴 Bodega de Aseo</h1>
+  <div class="topbar-logo">🧴 Bodega Aseo<span>Colegio Centenario de Temuco</span></div>
   <div class="topbar-links">
-    <a href="/">📦 Inventario</a>
-    <a href="/dashboard">📊 Dashboard</a>
+    <a href="/">🏠 Inventario</a>
+    {% if rol == 'admin' %}<a href="/dashboard">📊 Dashboard</a>{% endif %}
     <a href="/movimientos">📋 Movimientos</a>
-    <a href="/reposicion" style="color:#FFD966;font-weight:600">🛒 Reposición</a>
-    <a href="/guia" style="color:#90caf9">📄 Guía Salida</a>
-    <a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>
-    <a href="/logout">Salir</a>
+    {% if rol == 'admin' %}<a href="/reposicion" class="active">🛒 Reposición</a>{% endif %}
+    {% if rol == 'admin' %}<a href="/facturas">🧾 Facturas</a>{% endif %}
+    <a href="/guia">📄 Guía Salida</a>
+    {% if rol in ('admin','operador') %}<a href="/guia_entrada">📥 Guía Entrada</a>{% endif %}
+  </div>
+  <div class="topbar-right">
+    <span class="user-pill">👤 {{ user }}</span>
+    <button class="btn-logout" onclick="location='/logout'">Salir</button>
   </div>
 </div>
 
@@ -141,16 +151,16 @@ async function cargarReposicion(){
     return `<tr>
       <td style="font-weight:700;color:#0D4F3C">${p.nombre}</td>
       <td><span class="badge-cat">${p.categoria}</span></td>
-      <td style="color:#888">${p.unidad}</td>
+      <td style="color:#5E7B6E">${p.unidad}</td>
       <td class="${agotado?'stock-cero':''}">${p.stock_actual} ${p.unidad}</td>
-      <td style="color:#888">${p.stock_minimo}</td>
+      <td style="color:#5E7B6E">${p.stock_minimo}</td>
       <td>
         <div class="progress-wrap">
           <div class="progress-bg"><div class="progress-fill" style="width:${pct}%"></div></div>
-          <span style="font-size:11px;color:#C00;font-weight:600">${pct}%</span>
+          <span style="font-size:11px;color:#9B1C1C;font-weight:600">${pct}%</span>
         </div>
       </td>
-      <td style="color:#555">${prom>0?prom+' '+p.unidad:'—'}</td>
+      <td style="color:#5E7B6E">${prom>0?prom+' '+p.unidad:'—'}</td>
       <td><span class="${agotado?'cant-agotado':'cant-sugerida'}">${p.cantidad_sugerida} ${p.unidad}</span></td>
     </tr>`;
   }).join('');
@@ -178,7 +188,7 @@ async function cargarSemanal(){
       return `<div class="semana-ed">
         <div class="semana-ed-name">🏫 ${ed} <span class="semana-total">(${info.total} unidades)</span></div>
         ${top3.map(p=>`<div class="semana-prod"><span>${p.nombre}</span><span style="font-weight:600">${p.total} ${p.unidad}</span></div>`).join('')}
-        ${info.productos.length>3?`<div style="font-size:10px;color:#aaa;margin-top:2px">+${info.productos.length-3} productos más</div>`:''}
+        ${info.productos.length>3?`<div style="font-size:10px;color:#5E7B6E;margin-top:2px">+${info.productos.length-3} productos más</div>`:''}
       </div>`;
     }).join('');
   }
@@ -186,7 +196,6 @@ async function cargarSemanal(){
   renderSemana(d.semana_actual, 'sem-actual');
   renderSemana(d.semana_anterior, 'sem-anterior');
 
-  // Comparar totales
   const act = d.semana_actual.total;
   const ant = d.semana_anterior.total;
   if(ant > 0){
