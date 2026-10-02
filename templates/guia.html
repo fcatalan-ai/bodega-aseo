@@ -498,6 +498,7 @@ async function emitirGuia(){
         guia_id: guiaId, fecha: fechaFmt, responsable, edificio,
         observacion: obs, items: itemsConUnidad,
         pdf_b64: pdfB64 || '',
+        firma_b64: firma_b64 || '',
       })
     });
   } catch(e){
