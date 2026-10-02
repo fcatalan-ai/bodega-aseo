@@ -114,6 +114,20 @@ def init_db():
             cur.execute("ALTER TABLE guias_entrada ADD COLUMN cloudinary_url TEXT")
     except Exception:
         pass  # columna ya existe en SQLite
+    # Tabla guías de salida
+    cur.execute(f'''CREATE TABLE IF NOT EXISTS guias_salida (
+        id {PK}, guia_id TEXT, fecha TEXT,
+        responsable TEXT, edificio TEXT, observacion TEXT,
+        usuario TEXT, items_json TEXT, cloudinary_url TEXT, created_at {TS}
+    )''')
+    # Migración: agregar cloudinary_url si ya existe sin esa columna
+    try:
+        if mode == 'pg':
+            cur.execute("ALTER TABLE guias_salida ADD COLUMN IF NOT EXISTS cloudinary_url TEXT")
+        else:
+            cur.execute("ALTER TABLE guias_salida ADD COLUMN cloudinary_url TEXT")
+    except Exception:
+        pass
     if mode == 'pg':
         admin_email = os.environ.get('ADMIN_EMAIL','bodega@colegio.cl')
         admin_pass  = os.environ.get('ADMIN_PASS','bodega2025')
@@ -1664,6 +1678,187 @@ def delete_guia_entrada(gid):
     finally:
         conn2.close()
 
+    return jsonify({'ok': True})
+
+
+# ── GUÍAS DE SALIDA ───────────────────────────────────────────────────────────
+
+@app.route('/api/guias_salida', methods=['POST'])
+@login_required
+def crear_guia_salida():
+    """Guarda un registro de guía de salida y sube el PDF a Cloudinary."""
+    import json as _json
+    d = request.json
+    guia_id    = d.get('guia_id', '')
+    fecha      = d.get('fecha', '')
+    responsable= d.get('responsable', '')
+    edificio   = d.get('edificio', '')
+    obs        = d.get('observacion', '')
+    items      = d.get('items', [])
+    pdf_b64    = d.get('pdf_b64', '')
+    usuario    = session.get('user', '')
+    items_json = _json.dumps(items, ensure_ascii=False)
+
+    # Subir PDF a Cloudinary
+    cloudinary_url = None
+    if pdf_b64 and CLOUDINARY_URL:
+        try:
+            pdf_bytes = base64.b64decode(pdf_b64)
+            filename  = f"{guia_id}.pdf"
+            import cloudinary, cloudinary.uploader
+            cloudinary.config(cloudinary_url=CLOUDINARY_URL)
+            folder    = 'bodega_aseo/guias_salida'
+            public_id = f"{folder}/{guia_id}"
+            result = cloudinary.uploader.upload(
+                io.BytesIO(pdf_bytes),
+                resource_type='raw',
+                public_id=public_id,
+                format='pdf',
+                overwrite=True,
+                use_filename=True,
+                unique_filename=False,
+            )
+            cloudinary_url = result.get('secure_url')
+        except Exception as e:
+            print(f"[Cloudinary guia salida] {e}")
+
+    conn, mode = get_db()
+    cur = conn.cursor()
+    try:
+        if mode == 'pg':
+            cur.execute(
+                "INSERT INTO guias_salida (guia_id,fecha,responsable,edificio,observacion,usuario,items_json,cloudinary_url) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+                (guia_id, fecha, responsable, edificio, obs, usuario, items_json, cloudinary_url))
+            row = cur.fetchone()
+            new_id = row[0] if row else None
+        else:
+            cur.execute(
+                "INSERT INTO guias_salida (guia_id,fecha,responsable,edificio,observacion,usuario,items_json,cloudinary_url) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (guia_id, fecha, responsable, edificio, obs, usuario, items_json, cloudinary_url))
+            new_id = cur.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+
+    return jsonify({'ok': True, 'id': new_id, 'cloudinary_url': cloudinary_url})
+
+
+@app.route('/api/guias_salida', methods=['GET'])
+@login_required
+def get_guias_salida():
+    """Lista guías de salida. Admin ve todas; edificio ve solo las suyas."""
+    import json as _json
+    rol      = session.get('rol', 'edificio')
+    edificio = session.get('edificio', '')
+    if rol == 'admin' or rol == 'operador':
+        rows = db_fetchall(
+            "SELECT id,guia_id,fecha,responsable,edificio,observacion,usuario,items_json,cloudinary_url,created_at "
+            "FROM guias_salida ORDER BY id DESC LIMIT 200", ())
+    else:
+        rows = db_fetchall(
+            "SELECT id,guia_id,fecha,responsable,edificio,observacion,usuario,items_json,cloudinary_url,created_at "
+            "FROM guias_salida WHERE edificio=? ORDER BY id DESC LIMIT 200", (edificio,))
+
+    result = []
+    for r in rows:
+        row = dict(r) if hasattr(r, 'keys') else {
+            'id': r[0], 'guia_id': r[1], 'fecha': r[2], 'responsable': r[3],
+            'edificio': r[4], 'observacion': r[5], 'usuario': r[6],
+            'items_json': r[7], 'cloudinary_url': r[8], 'created_at': r[9]
+        }
+        try:
+            row['items'] = _json.loads(row.get('items_json') or '[]')
+        except Exception:
+            row['items'] = []
+        result.append(row)
+    return jsonify(result)
+
+
+@app.route('/api/guias_salida/<int:gid>/pdf', methods=['POST'])
+@login_required
+def regenerar_pdf_guia_salida(gid):
+    """Regenera el PDF de una guía de salida existente."""
+    import json as _json
+    row = db_fetchone("SELECT * FROM guias_salida WHERE id=?", (gid,))
+    if not row:
+        return jsonify({'error': 'No encontrada'}), 404
+
+    row = dict(row) if hasattr(row, 'keys') else {
+        'guia_id': row[2], 'fecha': row[3], 'responsable': row[4],
+        'edificio': row[5], 'observacion': row[6], 'items_json': row[8]
+    }
+    items = []
+    try:
+        items = _json.loads(row.get('items_json') or '[]')
+    except Exception:
+        pass
+
+    # Reutilizar el endpoint de generación de PDF
+    from flask import current_app
+    with current_app.test_request_context(
+        '/api/guias/pdf', method='POST',
+        json={
+            'guia_id':    row.get('guia_id', ''),
+            'fecha':      row.get('fecha', ''),
+            'responsable':row.get('responsable', ''),
+            'edificio':   row.get('edificio', ''),
+            'obs':        row.get('observacion', ''),
+            'items':      items,
+            'firma':      '',
+        },
+        headers={'Content-Type': 'application/json'}
+    ):
+        resp = generar_pdf_guia()
+    if hasattr(resp, 'get_json'):
+        data = resp.get_json()
+    else:
+        import json as _json2
+        data = _json2.loads(resp.data)
+    return jsonify(data)
+
+
+@app.route('/api/guias_salida/<int:gid>', methods=['PUT'])
+@login_required
+def editar_guia_salida(gid):
+    """Edita campos de metadata de una guía de salida (no productos)."""
+    d = request.json
+    responsable = d.get('responsable', '')
+    edificio    = d.get('edificio', '')
+    obs         = d.get('observacion', '')
+
+    conn, mode = get_db()
+    cur = conn.cursor()
+    try:
+        if mode == 'pg':
+            cur.execute(
+                "UPDATE guias_salida SET responsable=%s, edificio=%s, observacion=%s WHERE id=%s",
+                (responsable, edificio, obs, gid))
+        else:
+            cur.execute(
+                "UPDATE guias_salida SET responsable=?, edificio=?, observacion=? WHERE id=?",
+                (responsable, edificio, obs, gid))
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/guias_salida/<int:gid>', methods=['DELETE'])
+@admin_required
+def eliminar_guia_salida(gid):
+    """Elimina el registro de guía de salida (el stock ya fue descontado vía movimientos)."""
+    conn, mode = get_db()
+    cur = conn.cursor()
+    try:
+        if mode == 'pg':
+            cur.execute("DELETE FROM guias_salida WHERE id=%s", (gid,))
+        else:
+            cur.execute("DELETE FROM guias_salida WHERE id=?", (gid,))
+        conn.commit()
+    finally:
+        conn.close()
     return jsonify({'ok': True})
 
 
