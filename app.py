@@ -7,6 +7,32 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'bodega-aseo-2025-secret')
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
+# ── Cloudinary ────────────────────────────────────────────────────────────────
+CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '')
+
+def cloudinary_upload_pdf(pdf_bytes, filename):
+    """Sube un PDF a Cloudinary y retorna la URL segura. Retorna None si falla."""
+    if not CLOUDINARY_URL:
+        return None
+    try:
+        import cloudinary, cloudinary.uploader
+        cloudinary.config(cloudinary_url=CLOUDINARY_URL)
+        folder = 'bodega_aseo/facturas'
+        public_id = f"{folder}/{os.path.splitext(filename)[0]}"
+        result = cloudinary.uploader.upload(
+            io.BytesIO(pdf_bytes),
+            resource_type='raw',
+            public_id=public_id,
+            format='pdf',
+            overwrite=True,
+            use_filename=True,
+            unique_filename=False,
+        )
+        return result.get('secure_url')
+    except Exception as e:
+        print(f'[cloudinary] Error al subir {filename}: {e}')
+        return None
+
 CATEGORIAS = ['Papel','Bolsas','Líquidos Limpieza','Desinfectantes','Paños','Guantes','Varios']
 EDIFICIOS  = ['Básica','Media','Parvularia','Administración']
 MESES      = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -78,8 +104,16 @@ def init_db():
         id {PK}, guia_id TEXT, fecha TEXT,
         proveedor TEXT, observacion TEXT, usuario TEXT,
         total_neto INTEGER DEFAULT 0, total_iva INTEGER DEFAULT 0, total INTEGER DEFAULT 0,
-        origen TEXT DEFAULT 'manual', items_json TEXT, created_at {TS}
+        origen TEXT DEFAULT 'manual', items_json TEXT, cloudinary_url TEXT, created_at {TS}
     )''')
+    # Migración: agregar cloudinary_url si la tabla ya existe sin esa columna
+    try:
+        if mode == 'pg':
+            cur.execute("ALTER TABLE guias_entrada ADD COLUMN IF NOT EXISTS cloudinary_url TEXT")
+        else:
+            cur.execute("ALTER TABLE guias_entrada ADD COLUMN cloudinary_url TEXT")
+    except Exception:
+        pass  # columna ya existe en SQLite
     if mode == 'pg':
         admin_email = os.environ.get('ADMIN_EMAIL','bodega@colegio.cl')
         admin_pass  = os.environ.get('ADMIN_PASS','bodega2025')
@@ -1211,8 +1245,11 @@ def parsear_factura():
             import pdfplumber
 
         pdf_bytes = file.read()
+        pdf_filename = file.filename or 'factura.pdf'
         rows_parsed = []
         meta = {'numero': '', 'proveedor': '', 'fecha': '', 'neto': 0, 'iva': 0, 'total': 0}
+        # Subir a Cloudinary en paralelo (no bloquea el parseo)
+        cloudinary_url_result = cloudinary_upload_pdf(pdf_bytes, pdf_filename)
 
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             page = pdf.pages[0]
@@ -1341,7 +1378,8 @@ def parsear_factura():
                 row['producto_nombre'] = ''
                 row['match_score'] = 0.0
 
-        return jsonify({'ok': True, 'meta': meta, 'rows': rows_parsed, 'productos': productos})
+        return jsonify({'ok': True, 'meta': meta, 'rows': rows_parsed, 'productos': productos,
+                        'cloudinary_url': cloudinary_url_result})
     except Exception as e:
         import traceback
         return jsonify({'error': str(e), 'detalle': traceback.format_exc()}), 500
@@ -1355,6 +1393,7 @@ def procesar_factura():
     fecha_mov = meta.get('fecha') or datetime.now().strftime('%d-%m-%Y')
     num = meta.get('numero', '?')
     proveedor = meta.get('proveedor', '')
+    cloudinary_url_recv = d.get('cloudinary_url') or ''
     obs_base = f"[Factura N°{num} | {proveedor}]"
 
     procesados = 0
@@ -1419,12 +1458,12 @@ def procesar_factura():
         try:
             if mode3 == 'pg':
                 cur3.execute(
-                    "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                    (guia_id, fecha_mov, proveedor, f"Factura N°{num}", session['user'], total_neto, total_iva, total_tot, 'factura', _json.dumps(items_list, ensure_ascii=False)))
+                    "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json,cloudinary_url) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (guia_id, fecha_mov, proveedor, f"Factura N°{num}", session['user'], total_neto, total_iva, total_tot, 'factura', _json.dumps(items_list, ensure_ascii=False), cloudinary_url_recv))
             else:
                 cur3.execute(
-                    "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                    (guia_id, fecha_mov, proveedor, f"Factura N°{num}", session['user'], total_neto, total_iva, total_tot, 'factura', _json.dumps(items_list, ensure_ascii=False)))
+                    "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json,cloudinary_url) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    (guia_id, fecha_mov, proveedor, f"Factura N°{num}", session['user'], total_neto, total_iva, total_tot, 'factura', _json.dumps(items_list, ensure_ascii=False), cloudinary_url_recv))
             conn3.commit()
         except Exception:
             pass
@@ -1448,7 +1487,7 @@ def get_guias_entrada():
             _prod_cache[pid] = p.get('nombre', '—') if p else '—'
         return _prod_cache[pid]
 
-    rows = db_fetchall("SELECT id,guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json,created_at FROM guias_entrada ORDER BY id DESC LIMIT 100")
+    rows = db_fetchall("SELECT id,guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json,cloudinary_url,created_at FROM guias_entrada ORDER BY id DESC LIMIT 100")
     result = []
     for r in rows:
         items = []
@@ -1464,7 +1503,9 @@ def get_guias_entrada():
             'id': r.get('id'), 'guia_id': r.get('guia_id'), 'fecha': r.get('fecha'),
             'proveedor': r.get('proveedor'), 'observacion': r.get('observacion'), 'usuario': r.get('usuario'),
             'total_neto': r.get('total_neto'), 'total_iva': r.get('total_iva'), 'total': r.get('total'),
-            'origen': r.get('origen'), 'items': items, 'created_at': str(r.get('created_at',''))
+            'origen': r.get('origen'), 'items': items,
+            'cloudinary_url': r.get('cloudinary_url') or '',
+            'created_at': str(r.get('created_at',''))
         })
     return jsonify(result)
 
