@@ -1913,23 +1913,36 @@ def regenerar_pdf_guia_salida(gid):
 @app.route('/api/guias_salida/<int:gid>', methods=['PUT'])
 @login_required
 def editar_guia_salida(gid):
-    """Edita campos de metadata de una guía de salida (no productos)."""
+    """Edita campos de metadata de una guía de salida, incluyendo items."""
+    import json as _json
     d = request.json
     responsable = d.get('responsable', '')
     edificio    = d.get('edificio', '')
     obs         = d.get('observacion', '')
+    items       = d.get('items', None)  # lista de {nombre, cantidad} o None si no se envía
 
     conn, mode = get_db()
     cur = conn.cursor()
     try:
-        if mode == 'pg':
-            cur.execute(
-                "UPDATE guias_salida SET responsable=%s, edificio=%s, observacion=%s WHERE id=%s",
-                (responsable, edificio, obs, gid))
+        if items is not None:
+            items_json = _json.dumps(items, ensure_ascii=False)
+            if mode == 'pg':
+                cur.execute(
+                    "UPDATE guias_salida SET responsable=%s, edificio=%s, observacion=%s, items_json=%s WHERE id=%s",
+                    (responsable, edificio, obs, items_json, gid))
+            else:
+                cur.execute(
+                    "UPDATE guias_salida SET responsable=?, edificio=?, observacion=?, items_json=? WHERE id=?",
+                    (responsable, edificio, obs, items_json, gid))
         else:
-            cur.execute(
-                "UPDATE guias_salida SET responsable=?, edificio=?, observacion=? WHERE id=?",
-                (responsable, edificio, obs, gid))
+            if mode == 'pg':
+                cur.execute(
+                    "UPDATE guias_salida SET responsable=%s, edificio=%s, observacion=%s WHERE id=%s",
+                    (responsable, edificio, obs, gid))
+            else:
+                cur.execute(
+                    "UPDATE guias_salida SET responsable=?, edificio=?, observacion=? WHERE id=?",
+                    (responsable, edificio, obs, gid))
         conn.commit()
     finally:
         conn.close()
