@@ -5,18 +5,23 @@
 <title>Bodega Aseo — Inventario</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
-.topbar{background:#0D4F3C;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
-.topbar h1{font-size:16px;font-weight:700}
-.topbar-links{display:flex;align-items:center;gap:14px;font-size:13px}
-.topbar-links a{color:#A8D5C5;text-decoration:none}
-.topbar-links a:hover{color:#fff}
-.topbar-links a.dash{color:#FFD966;font-weight:600}
-.main{padding:16px;max-width:1300px;margin:0 auto}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF3F0;min-height:100vh;color:#1C2E26}
+.topbar{background:#0D4F3C;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:50;box-shadow:0 2px 10px rgba(0,0,0,0.18)}
+.topbar-logo{font-weight:700;font-size:15px;color:#fff;line-height:1.2;white-space:nowrap}
+.topbar-logo span{display:block;font-size:11px;color:#98D4BC;font-weight:400}
+.topbar-links{display:flex;gap:2px;align-items:center}
+.topbar-links a{color:#B2CEC4;text-decoration:none;font-size:13px;padding:6px 10px;border-radius:7px;transition:.15s;white-space:nowrap}
+.topbar-links a:hover{background:rgba(255,255,255,0.13);color:#fff}
+.topbar-links a.active{color:#fff;font-weight:600;background:rgba(255,255,255,0.15)}
+.topbar-right{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.topbar-right .user-pill{color:#98D4BC;font-size:12px}
+.btn-logout{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.22);padding:5px 14px;border-radius:7px;font-size:12px;cursor:pointer;transition:.15s}
+.btn-logout:hover{background:rgba(255,255,255,0.22)}
+.main{padding:18px;max-width:1300px;margin:0 auto}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
 @media(max-width:600px){.stats{grid-template-columns:repeat(2,1fr)}}
-.stat{background:#fff;border-radius:10px;padding:14px 16px;text-align:center;border:1px solid #e5e8ed}
-.stat-n{font-size:26px;font-weight:700;color:#0D4F3C}
+.stat{background:#fff;border-radius:12px;padding:16px 18px;text-align:center;border:1px solid #D4E4DC;box-shadow:0 1px 4px rgba(13,79,60,0.06)}
+.stat-n{font-size:28px;font-weight:700;color:#0D4F3C}
 .stat-n.alert{color:#C00}
 .stat-l{font-size:11px;color:#888;margin-top:3px}
 .toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
@@ -25,12 +30,12 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 .btn-green:hover{background:#1a6b52}
 .btn-out{background:#fff;color:#0D4F3C;border:1px solid #0D4F3C;padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap}
 .btn-out:hover{background:#f0f7f4}
-.table-wrap{background:#fff;border-radius:10px;border:1px solid #e5e8ed;overflow:auto}
+.table-wrap{background:#fff;border-radius:12px;border:1px solid #D4E4DC;overflow:auto;box-shadow:0 1px 4px rgba(13,79,60,0.06)}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
-th{background:#0D4F3C;color:#fff;padding:9px 12px;text-align:left;font-size:11px;font-weight:600}
-td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+th{background:#0D4F3C;color:#fff;padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.3px}
+td{padding:10px 12px;border-bottom:1px solid #EEF3F0;vertical-align:middle;color:#1C2E26}
 tr:last-child td{border-bottom:none}
-tr:hover td{background:#f0f7f4}
+tr:hover td{background:#F0F7F3}
 .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
 .badge-ok{background:#E2EFDA;color:#27500A}
 .badge-low{background:#FCEBEB;color:#791F1F}
@@ -92,15 +97,19 @@ tr:hover td{background:#f0f7f4}
 </head>
 <body>
 <div class="topbar">
-  <h1>🧴 Bodega de Aseo — Colegio</h1>
+  <div class="topbar-logo">🧴 Bodega Aseo<span>Colegio Centenario de Temuco</span></div>
   <div class="topbar-links">
-    <span>🧴 Bodega de Aseo</span>
-    <a href="/dashboard" class="dash">📊 Dashboard</a>
-    <a href="/movimientos" style="color:#A8D5C5">📋 Movimientos</a>
-    {% if rol == 'admin' %}<a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>{% endif %}
-    <a href="/guia" style="color:#90caf9">📄 Guía Salida</a>
-    {% if rol in ('admin','operador') %}<a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>{% endif %}
-    <a href="/logout">Salir</a>
+    <a href="/" class="active">🏠 Inventario</a>
+    {% if rol == 'admin' %}<a href="/dashboard">📊 Dashboard</a>{% endif %}
+    <a href="/movimientos">📋 Movimientos</a>
+    {% if rol == 'admin' %}<a href="/reposicion">🛒 Reposición</a>{% endif %}
+    {% if rol == 'admin' %}<a href="/facturas">🧾 Facturas</a>{% endif %}
+    <a href="/guia">📄 Guía Salida</a>
+    {% if rol in ('admin','operador') %}<a href="/guia_entrada">📥 Guía Entrada</a>{% endif %}
+  </div>
+  <div class="topbar-right">
+    <span class="user-pill">👤 {{ user }}</span>
+    <button class="btn-logout" onclick="location='/logout'">Salir</button>
   </div>
 </div>
 
