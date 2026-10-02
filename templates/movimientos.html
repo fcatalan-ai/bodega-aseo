@@ -53,6 +53,15 @@ tr:hover td{background:#f8faf8}
 .pag-btn{padding:4px 10px;border:1px solid #ddd;border-radius:5px;background:#fff;cursor:pointer;font-size:12px}
 .pag-btn:hover{background:#f0f4f8}
 .pag-btn.active{background:#0D4F3C;color:#fff;border-color:#0D4F3C}
+/* SELECCIÓN MASIVA */
+.th-chk,.td-chk{width:36px;padding:6px 8px!important;text-align:center}
+input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:#0D4F3C}
+tr.selected td{background:#e8f4ee!important}
+.bulk-bar{display:none;align-items:center;gap:10px;background:#0D4F3C;color:#fff;padding:8px 14px;border-radius:8px;margin-bottom:10px;font-size:13px}
+.bulk-bar.show{display:flex}
+.btn-bulk-del{background:#c00;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600}
+.btn-bulk-del:hover{background:#a00}
+.btn-bulk-cancel{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer}
 /* MODAL */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:none;align-items:center;justify-content:center}
 .modal-bg.show{display:flex}
@@ -141,11 +150,19 @@ tr:hover td{background:#f8faf8}
     </div>
   </div>
 
+  <!-- BARRA SELECCIÓN MASIVA -->
+  <div class="bulk-bar" id="bulk-bar">
+    <span id="bulk-count">0 seleccionados</span>
+    <button class="btn-bulk-del" onclick="eliminarSeleccionados()">🗑️ Eliminar seleccionados</button>
+    <button class="btn-bulk-cancel" onclick="limpiarSeleccion()">✕ Cancelar</button>
+  </div>
+
   <!-- TABLA -->
   <div class="table-wrap">
     <table>
       <thead>
         <tr id="thead-row">
+          <th class="th-e th-chk"><input type="checkbox" id="chk-all" onclick="toggleTodos(this)" title="Seleccionar todos"></th>
           <th class="th-e">Fecha</th>
           <th class="th-e">Tipo</th>
           <th class="th-e">Producto</th>
@@ -158,7 +175,7 @@ tr:hover td{background:#f8faf8}
         </tr>
       </thead>
       <tbody id="tabla-body">
-        <tr><td colspan="9" class="loading">Cargando movimientos...</td></tr>
+        <tr><td colspan="10" class="loading">Cargando movimientos...</td></tr>
       </tbody>
     </table>
     <div class="paginacion">
@@ -258,14 +275,17 @@ function renderTabla(){
   document.getElementById('ms-cant').textContent = total_cant.toLocaleString('es-CL');
 
   if(!pagina.length){
-    document.getElementById('tabla-body').innerHTML='<tr><td colspan="9" class="loading">No se encontraron movimientos</td></tr>';
+    document.getElementById('tabla-body').innerHTML='<tr><td colspan="10" class="loading">No se encontraron movimientos</td></tr>';
     document.getElementById('pag-info').textContent='Sin resultados';
     document.getElementById('pag-btns').innerHTML='';
     return;
   }
 
   document.getElementById('tabla-body').innerHTML = pagina.map(m=>`
-    <tr>
+    <tr id="row-${m.id}">
+      <td class="td-chk">
+        ${ROL_USUARIO==='admin'?`<input type="checkbox" class="chk-row" data-id="${m.id}" onchange="actualizarBulk()">`:''}
+      </td>
       <td style="white-space:nowrap">${m.fecha||'—'}</td>
       <td><span class="${m.tipo==='entrada'?'badge-e':'badge-s'}">${m.tipo==='entrada'?'📥 Entrada':'📤 Salida'}</span></td>
       <td style="font-weight:600;color:#0D4F3C">${m.producto_nombre||'—'}</td>
@@ -281,6 +301,8 @@ function renderTabla(){
         `:''}
       </td>
     </tr>`).join('');
+  // Sincronizar estado visual de checkbox "todos"
+  actualizarBulk();
 
   // Paginacion
   const totalPags = Math.ceil(movimientos.length/POR_PAGINA);
@@ -348,6 +370,58 @@ async function eliminar(id, nombre){
 }
 
 function cerrarModal(){ document.getElementById('modal-edit').classList.remove('show'); }
+
+// ── SELECCIÓN MASIVA ──────────────────────────────────────────────────────────
+function getSeleccionados(){
+  return [...document.querySelectorAll('.chk-row:checked')].map(c=>parseInt(c.dataset.id));
+}
+
+function actualizarBulk(){
+  const sel = getSeleccionados();
+  const total = document.querySelectorAll('.chk-row').length;
+  const bar = document.getElementById('bulk-bar');
+  document.getElementById('bulk-count').textContent = `${sel.length} seleccionado${sel.length!==1?'s':''}`;
+  bar.classList.toggle('show', sel.length > 0);
+  // Marcar filas visualmente
+  document.querySelectorAll('.chk-row').forEach(c=>{
+    document.getElementById('row-'+c.dataset.id)?.classList.toggle('selected', c.checked);
+  });
+  // Estado del checkbox "todos"
+  const chkAll = document.getElementById('chk-all');
+  if(chkAll){
+    chkAll.checked = sel.length === total && total > 0;
+    chkAll.indeterminate = sel.length > 0 && sel.length < total;
+  }
+}
+
+function toggleTodos(chkAll){
+  document.querySelectorAll('.chk-row').forEach(c=>{ c.checked = chkAll.checked; });
+  actualizarBulk();
+}
+
+function limpiarSeleccion(){
+  document.querySelectorAll('.chk-row').forEach(c=>{ c.checked = false; });
+  const chkAll = document.getElementById('chk-all');
+  if(chkAll){ chkAll.checked = false; chkAll.indeterminate = false; }
+  actualizarBulk();
+}
+
+async function eliminarSeleccionados(){
+  const ids = getSeleccionados();
+  if(!ids.length) return;
+  if(!confirm(`¿Eliminar ${ids.length} movimiento${ids.length!==1?'s':''}?\n\nEl stock se ajustará automáticamente para cada uno.`)) return;
+  let ok = 0, err = 0;
+  for(const id of ids){
+    try {
+      const r = await fetch('/api/movimientos/'+id, {method:'DELETE'});
+      const d = await r.json();
+      if(d.ok) ok++; else err++;
+    } catch { err++; }
+  }
+  limpiarSeleccion();
+  cargar();
+  if(err) alert(`${ok} eliminado${ok!==1?'s':''}, ${err} error${err!==1?'s':''}.`);
+}
 
 function exportar(){ window.location='/api/export/movimientos'; }
 
