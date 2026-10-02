@@ -377,7 +377,7 @@ function renderPreview(data) {
     tr.id = `fila-${i}`;
     tr.innerHTML = `
       <td>${i+1}</td>
-      <td><b style="color:#fff">${row.nombre_factura}</b></td>
+      <td><b style="color:var(--texto)">${row.nombre_factura}</b></td>
       <td><input type="number" id="cant-${i}" value="${row.cantidad}" min="1" style="width:68px" oninput="actualizarInfo()"></td>
       <td class="td-num">$${fmt(row.precio_unit)}</td>
       <td class="td-num">$${fmt(row.valor)}</td>
