@@ -118,16 +118,18 @@ def init_db():
     cur.execute(f'''CREATE TABLE IF NOT EXISTS guias_salida (
         id {PK}, guia_id TEXT, fecha TEXT,
         responsable TEXT, edificio TEXT, observacion TEXT,
-        usuario TEXT, items_json TEXT, cloudinary_url TEXT, created_at {TS}
+        usuario TEXT, items_json TEXT, cloudinary_url TEXT,
+        firma_b64 TEXT, created_at {TS}
     )''')
-    # Migración: agregar cloudinary_url si ya existe sin esa columna
-    try:
-        if mode == 'pg':
-            cur.execute("ALTER TABLE guias_salida ADD COLUMN IF NOT EXISTS cloudinary_url TEXT")
-        else:
-            cur.execute("ALTER TABLE guias_salida ADD COLUMN cloudinary_url TEXT")
-    except Exception:
-        pass
+    # Migraciones para tablas existentes
+    for col, tipo in [('cloudinary_url', 'TEXT'), ('firma_b64', 'TEXT')]:
+        try:
+            if mode == 'pg':
+                cur.execute(f"ALTER TABLE guias_salida ADD COLUMN IF NOT EXISTS {col} {tipo}")
+            else:
+                cur.execute(f"ALTER TABLE guias_salida ADD COLUMN {col} {tipo}")
+        except Exception:
+            pass
     if mode == 'pg':
         admin_email = os.environ.get('ADMIN_EMAIL','bodega@colegio.cl')
         admin_pass  = os.environ.get('ADMIN_PASS','bodega2025')
@@ -1696,6 +1698,7 @@ def crear_guia_salida():
     obs        = d.get('observacion', '')
     items      = d.get('items', [])
     pdf_b64    = d.get('pdf_b64', '')
+    firma_b64  = d.get('firma_b64', '')
     usuario    = session.get('user', '')
     items_json = _json.dumps(items, ensure_ascii=False)
 
@@ -1727,16 +1730,16 @@ def crear_guia_salida():
     try:
         if mode == 'pg':
             cur.execute(
-                "INSERT INTO guias_salida (guia_id,fecha,responsable,edificio,observacion,usuario,items_json,cloudinary_url) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
-                (guia_id, fecha, responsable, edificio, obs, usuario, items_json, cloudinary_url))
+                "INSERT INTO guias_salida (guia_id,fecha,responsable,edificio,observacion,usuario,items_json,cloudinary_url,firma_b64) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+                (guia_id, fecha, responsable, edificio, obs, usuario, items_json, cloudinary_url, firma_b64))
             row = cur.fetchone()
             new_id = row[0] if row else None
         else:
             cur.execute(
-                "INSERT INTO guias_salida (guia_id,fecha,responsable,edificio,observacion,usuario,items_json,cloudinary_url) "
-                "VALUES (?,?,?,?,?,?,?,?)",
-                (guia_id, fecha, responsable, edificio, obs, usuario, items_json, cloudinary_url))
+                "INSERT INTO guias_salida (guia_id,fecha,responsable,edificio,observacion,usuario,items_json,cloudinary_url,firma_b64) "
+                "VALUES (?,?,?,?,?,?,?,?,?)",
+                (guia_id, fecha, responsable, edificio, obs, usuario, items_json, cloudinary_url, firma_b64))
             new_id = cur.lastrowid
         conn.commit()
     finally:
@@ -1785,9 +1788,9 @@ def regenerar_pdf_guia_salida(gid):
     cur = conn.cursor()
     try:
         if mode == 'pg':
-            cur.execute("SELECT guia_id,fecha,responsable,edificio,observacion,items_json FROM guias_salida WHERE id=%s", (gid,))
+            cur.execute("SELECT guia_id,fecha,responsable,edificio,observacion,items_json,firma_b64 FROM guias_salida WHERE id=%s", (gid,))
         else:
-            cur.execute("SELECT guia_id,fecha,responsable,edificio,observacion,items_json FROM guias_salida WHERE id=?", (gid,))
+            cur.execute("SELECT guia_id,fecha,responsable,edificio,observacion,items_json,firma_b64 FROM guias_salida WHERE id=?", (gid,))
         row = cur.fetchone()
     finally:
         conn.close()
@@ -1801,6 +1804,7 @@ def regenerar_pdf_guia_salida(gid):
     edificio    = row[3]
     observacion = row[4]
     items_json  = row[5]
+    firma_b64   = row[6] or ''
 
     try:
         items = _json.loads(items_json or '[]')
@@ -1890,12 +1894,35 @@ def regenerar_pdf_guia_salida(gid):
     pdf.cell(105, 7, safe(f'Total: {len(items)} producto(s)'), fill=True, border=0)
     pdf.cell(30, 7, str(total_cant), fill=True, border=0, align='C')
     pdf.cell(35, 7, 'unidades', fill=True, border=0, align='C')
-    pdf.ln(14)
+    pdf.ln(10)
 
-    pdf.set_font('Helvetica', '', 9)
-    pdf.cell(0, 6, '_' * 45 + '   ' + '_' * 30, ln=True)
-    pdf.set_font('Helvetica', '', 8)
-    pdf.cell(0, 5, safe('     Firma del responsable                    RUT'), ln=True)
+    # Firma del responsable
+    if firma_b64:
+        try:
+            # Quitar prefijo data:image/png;base64, si viene
+            b64data = firma_b64.split(',', 1)[-1] if ',' in firma_b64 else firma_b64
+            firma_bytes = base64.b64decode(b64data)
+            firma_buf = io.BytesIO(firma_bytes)
+            firma_path = '/tmp/_firma_tmp.png'
+            with open(firma_path, 'wb') as f:
+                f.write(firma_bytes)
+            pdf.set_font('Helvetica', 'B', 9)
+            pdf.cell(0, 6, safe('Firma del responsable:'), ln=True)
+            pdf.image(firma_path, x=15, w=70)
+            import os as _os
+            try: _os.remove(firma_path)
+            except: pass
+        except Exception:
+            # Fallback a línea si falla la imagen
+            pdf.set_font('Helvetica', '', 9)
+            pdf.cell(0, 6, '_' * 45 + '   ' + '_' * 30, ln=True)
+            pdf.set_font('Helvetica', '', 8)
+            pdf.cell(0, 5, safe('     Firma del responsable                    RUT'), ln=True)
+    else:
+        pdf.set_font('Helvetica', '', 9)
+        pdf.cell(0, 6, '_' * 45 + '   ' + '_' * 30, ln=True)
+        pdf.set_font('Helvetica', '', 8)
+        pdf.cell(0, 5, safe('     Firma del responsable                    RUT'), ln=True)
 
     pdf.ln(4)
     pdf.set_font('Helvetica', '', 7)
