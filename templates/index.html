@@ -185,6 +185,26 @@ tr:hover td{background:#f0f7f4}
         <div class="stock-bar-bg"><div class="stock-bar-fill" id="p-bar" style="width:0%"></div></div>
       </div>
       <div class="divider"></div>
+      <!-- SECCIÓN COSTOS -->
+      <div id="p-costos-wrap">
+        <div style="font-size:11px;color:#999;text-transform:uppercase;font-weight:600;margin-bottom:8px;letter-spacing:.5px">💰 Costos de compra</div>
+        <div class="field-grid" style="margin-bottom:10px">
+          <div class="field-box">
+            <label>Último precio unit.</label>
+            <div class="val" id="p-ultimo-precio" style="color:#0D4F3C">—</div>
+          </div>
+          <div class="field-box">
+            <label>Costo promedio pond.</label>
+            <div class="val" id="p-costo-promedio" style="color:#27500A">—</div>
+          </div>
+        </div>
+        <div id="p-compras-hist" style="display:none">
+          <div style="font-size:11px;color:#aaa;margin-bottom:5px">Historial de compras</div>
+          <div id="p-compras-list" style="font-size:12px;max-height:160px;overflow-y:auto;border:1px solid #eee;border-radius:6px;background:#fafafa"></div>
+        </div>
+        <div id="p-costos-sin-datos" style="display:none;font-size:12px;color:#aaa;font-style:italic">Sin compras registradas en guias de entrada.</div>
+      </div>
+      <div class="divider"></div>
       <div style="display:flex;gap:8px;margin-bottom:14px">
         <button class="btn-entrada" onclick="abrirMovimiento('entrada')">📥 Entrada</button>
         <button class="btn-salida" onclick="abrirMovimiento('salida')">📤 Salida</button>
@@ -361,6 +381,8 @@ function renderTabla(){
   }).join('');
 }
 
+function fmtPeso(n){ return n>0 ? '$'+Number(n).toLocaleString('es-CL') : '—'; }
+
 async function abrirPanel(id){
   const r = await fetch('/api/productos/'+id);
   const d = await r.json();
@@ -390,6 +412,40 @@ async function abrirPanel(id){
   // Mostrar/ocultar botones según rol
   const esAdmin = (ROL_USUARIO === 'admin');
   document.getElementById('btns-admin-prod').style.display = esAdmin ? 'flex' : 'none';
+  // Cargar costos
+  cargarCostos(id, p.unidad);
+}
+
+async function cargarCostos(pid, unidad){
+  document.getElementById('p-ultimo-precio').textContent = '…';
+  document.getElementById('p-costo-promedio').textContent = '…';
+  document.getElementById('p-compras-hist').style.display = 'none';
+  document.getElementById('p-costos-sin-datos').style.display = 'none';
+  try {
+    const rc = await fetch('/api/productos/'+pid+'/costos');
+    const c = await rc.json();
+    document.getElementById('p-ultimo-precio').textContent = fmtPeso(c.ultimo_precio);
+    document.getElementById('p-costo-promedio').textContent = fmtPeso(c.costo_promedio);
+    if(c.compras && c.compras.length){
+      document.getElementById('p-compras-hist').style.display = 'block';
+      document.getElementById('p-compras-list').innerHTML = c.compras.slice().reverse().map(cmp=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid #f0f0f0">
+          <div>
+            <div style="font-weight:600;color:#1a1a1a">${cmp.guia_id||'—'}</div>
+            <div style="color:#888;font-size:11px">${cmp.fecha||''} · ${cmp.proveedor||''}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:700;color:#0D4F3C">${fmtPeso(cmp.precio_unit)}</div>
+            <div style="color:#aaa;font-size:11px">${cmp.cantidad} ${unidad}</div>
+          </div>
+        </div>`).join('');
+    } else {
+      document.getElementById('p-costos-sin-datos').style.display = 'block';
+    }
+  } catch(e){
+    document.getElementById('p-ultimo-precio').textContent = '—';
+    document.getElementById('p-costo-promedio').textContent = '—';
+  }
 }
 
 function cerrarPanel(){
