@@ -401,6 +401,50 @@ def eliminar_producto(pid):
     db_run("UPDATE productos SET activo=FALSE WHERE id=?", (pid,))
     return jsonify({'ok':True})
 
+@app.route('/api/productos/<int:pid>/costos', methods=['GET'])
+@login_required
+def get_costos_producto(pid):
+    """Retorna historial de compras y costo promedio ponderado desde guias_entrada."""
+    guias = db_fetchall(
+        "SELECT guia_id, fecha, proveedor, items_json FROM guias_entrada ORDER BY fecha ASC", ())
+    compras = []
+    total_cant = 0
+    total_valor = 0
+    for g in guias:
+        items_raw = g.get('items_json') or '[]'
+        try:
+            items = json.loads(items_raw) if isinstance(items_raw, str) else items_raw
+        except Exception:
+            continue
+        for it in items:
+            try:
+                it_pid = int(it.get('producto_id') or 0)
+            except Exception:
+                it_pid = 0
+            if it_pid != pid:
+                continue
+            cant = int(it.get('cantidad') or 0)
+            precio = int(it.get('precio_unit') or 0)
+            if cant <= 0:
+                continue
+            compras.append({
+                'fecha': g.get('fecha', ''),
+                'proveedor': g.get('proveedor', ''),
+                'guia_id': g.get('guia_id', ''),
+                'cantidad': cant,
+                'precio_unit': precio,
+            })
+            if precio > 0:
+                total_cant += cant
+                total_valor += cant * precio
+    costo_promedio = round(total_valor / total_cant) if total_cant > 0 else 0
+    ultimo_precio = next((c['precio_unit'] for c in reversed(compras) if c['precio_unit'] > 0), 0)
+    return jsonify({
+        'compras': compras,
+        'costo_promedio': costo_promedio,
+        'ultimo_precio': ultimo_precio,
+    })
+
 # ── PAGINA PUBLICA POR QR (sin login) ────────────────────────────────────────
 @app.route('/producto/<int:pid>/publico')
 def producto_publico(pid):
