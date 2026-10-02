@@ -689,7 +689,7 @@ async function confirmar() {
   try {
     const r = await fetch('/api/facturas/procesar', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ meta, rows })
+      body: JSON.stringify({ meta, rows, cloudinary_url: parsedData?.cloudinary_url || '' })
     });
     const data = await r.json();
     btn.textContent = '✅ Registrar entradas';
