@@ -6,79 +6,89 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
-.topbar{background:#0D4F3C;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
-.topbar h1{font-size:16px;font-weight:700}
-.topbar-links{display:flex;gap:14px;font-size:13px}
-.topbar-links a{color:#A8D5C5;text-decoration:none}
-.topbar-links a:hover,.topbar-links a.active{color:#FFD966;font-weight:600}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF3F0;min-height:100vh;color:#1C2E26}
+.topbar{background:#0D4F3C;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:50;box-shadow:0 2px 10px rgba(0,0,0,0.18)}
+.topbar-logo{font-weight:700;font-size:15px;color:#fff;line-height:1.2;white-space:nowrap}
+.topbar-logo span{display:block;font-size:11px;color:#98D4BC;font-weight:400}
+.topbar-links{display:flex;gap:2px;align-items:center}
+.topbar-links a{color:#B2CEC4;text-decoration:none;font-size:13px;padding:6px 10px;border-radius:7px;transition:.15s;white-space:nowrap}
+.topbar-links a:hover{background:rgba(255,255,255,0.13);color:#fff}
+.topbar-links a.active{color:#fff;font-weight:600;background:rgba(255,255,255,0.15)}
+.topbar-right{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.topbar-right .user-pill{color:#98D4BC;font-size:12px}
+.btn-logout{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.22);padding:5px 14px;border-radius:7px;font-size:12px;cursor:pointer;transition:.15s}
+.btn-logout:hover{background:rgba(255,255,255,0.22)}
 .main{padding:20px;max-width:1400px;margin:0 auto}
 .sec{font-size:12px;font-weight:700;color:#0D4F3C;text-transform:uppercase;letter-spacing:.05em;margin:20px 0 10px;border-left:4px solid #0D4F3C;padding-left:8px}
 /* KPIs */
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:4px}
 @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
-.kpi{background:#fff;border-radius:10px;padding:16px;border:1px solid #e5e8ed;display:flex;align-items:center;gap:12px}
+.kpi{background:#fff;border-radius:12px;padding:16px;border:1px solid #D4E4DC;box-shadow:0 1px 4px rgba(13,79,60,0.06);display:flex;align-items:center;gap:12px}
 .kpi-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
 .kpi-n{font-size:22px;font-weight:700;color:#0D4F3C;line-height:1}
-.kpi-l{font-size:11px;color:#888;margin-top:3px}
+.kpi-l{font-size:11px;color:#5E7B6E;margin-top:3px}
 /* FILTRO */
-.filtro-card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;padding:16px;margin-bottom:16px}
+.filtro-card{background:#fff;border-radius:12px;border:1px solid #D4E4DC;box-shadow:0 1px 4px rgba(13,79,60,0.06);padding:16px;margin-bottom:16px}
 .filtro-title{font-size:12px;font-weight:700;color:#0D4F3C;text-transform:uppercase;margin-bottom:12px}
 .filtro-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
-.filtro-group label{font-size:11px;color:#666;display:block;margin-bottom:4px}
-.filtro-group input,.filtro-group select{padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;background:#fff}
+.filtro-group label{font-size:11px;color:#5E7B6E;display:block;margin-bottom:4px}
+.filtro-group input,.filtro-group select{padding:7px 10px;border:1px solid #D4E4DC;border-radius:7px;font-size:13px;background:#fff;color:#1C2E26}
 .btn-filtrar{background:#0D4F3C;color:#fff;border:none;padding:8px 18px;border-radius:7px;font-size:13px;cursor:pointer}
 .btn-filtrar:hover{background:#1a6b52}
 .btn-limpiar{background:#fff;color:#0D4F3C;border:1px solid #0D4F3C;padding:8px 14px;border-radius:7px;font-size:13px;cursor:pointer}
-.btn-limpiar:hover{background:#f0f7f4}
+.btn-limpiar:hover{background:#F0F7F3}
 .filtro-activo{background:#E2EFDA;border:1px solid #70AD47;border-radius:6px;padding:4px 10px;font-size:12px;color:#27500A;font-weight:600}
 /* RESULTADOS FILTRO */
 .resultado-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
-.res-card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;padding:14px;text-align:center}
+.res-card{background:#fff;border-radius:12px;border:1px solid #D4E4DC;box-shadow:0 1px 4px rgba(13,79,60,0.06);padding:14px;text-align:center}
 .res-n{font-size:24px;font-weight:700}
-.res-l{font-size:11px;color:#888;margin-top:3px}
+.res-l{font-size:11px;color:#5E7B6E;margin-top:3px}
 /* CHARTS */
 .charts-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
 .charts-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
 @media(max-width:900px){.charts-2,.charts-3{grid-template-columns:1fr}}
-.chart-card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;padding:16px}
+.chart-card{background:#fff;border-radius:12px;border:1px solid #D4E4DC;box-shadow:0 1px 4px rgba(13,79,60,0.06);padding:16px}
 .chart-title{font-size:11px;font-weight:700;color:#0D4F3C;margin-bottom:10px;text-transform:uppercase}
 .chart-wrap{position:relative;height:220px}
 /* TABLA */
-.table-card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;overflow:hidden;margin-bottom:14px}
+.table-card{background:#fff;border-radius:12px;border:1px solid #D4E4DC;box-shadow:0 1px 4px rgba(13,79,60,0.06);overflow:hidden;margin-bottom:14px}
 .table-card table{width:100%;border-collapse:collapse;font-size:12px}
 .table-card th{background:#0D4F3C;color:#fff;padding:8px 12px;text-align:left;font-size:11px}
-.table-card td{padding:8px 12px;border-bottom:1px solid #f0f0f0}
+.table-card td{padding:8px 12px;border-bottom:1px solid #EEF3F0;color:#1C2E26}
 .table-card tr:last-child td{border-bottom:none}
-.table-card tr:hover td{background:#f0f7f4}
-.badge-e{background:#E2EFDA;color:#27500A;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
-.badge-s{background:#FCEBEB;color:#791F1F;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.table-card tr:hover td{background:#F0F7F3}
+.badge-e{background:#D4EDDB;color:#1A5C32;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.badge-s{background:#FADFDF;color:#8B1515;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
 .badge-cat{background:#E6F1FB;color:#0C447C;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
-.alerta{background:#fff;border:1px solid #fcc;border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
-.loading{text-align:center;padding:30px;color:#999}
+.alerta{background:#fff;border:1px solid #F5BCBC;border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.loading{text-align:center;padding:30px;color:#5E7B6E}
 /* IMPORT MODAL */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:none;align-items:center;justify-content:center}
 .modal-bg.show{display:flex}
 .modal{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:500px;margin:16px}
 .modal h3{font-size:16px;font-weight:700;margin-bottom:16px;color:#0D4F3C}
-.upload-area{border:2px dashed #A8D5C5;border-radius:8px;padding:24px;text-align:center;cursor:pointer;background:#f0f7f4;transition:border-color 0.2s}
+.upload-area{border:2px dashed #A8D5C5;border-radius:8px;padding:24px;text-align:center;cursor:pointer;background:#F0F7F3;transition:border-color 0.2s}
 .upload-area:hover{border-color:#0D4F3C}
 .modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
-.btn-cancel{padding:8px 18px;border-radius:7px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:13px}
+.btn-cancel{padding:8px 18px;border-radius:7px;border:1px solid #D4E4DC;background:#fff;cursor:pointer;font-size:13px;color:#1C2E26}
 .btn-save{padding:8px 20px;border-radius:7px;border:none;background:#0D4F3C;color:#fff;cursor:pointer;font-size:13px}
 </style>
 </head>
 <body>
 <div class="topbar">
-  <h1>🧴 Bodega de Aseo — Dashboard</h1>
+  <div class="topbar-logo">🧴 Bodega Aseo<span>Colegio Centenario de Temuco</span></div>
   <div class="topbar-links">
-    <a href="/">📦 Inventario</a>
-    <a href="/dashboard" class="active">📊 Dashboard</a>
+    <a href="/">🏠 Inventario</a>
+    {% if rol == 'admin' %}<a href="/dashboard" class="active">📊 Dashboard</a>{% endif %}
     <a href="/movimientos">📋 Movimientos</a>
-    <a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>
-    <a href="/guia" style="color:#90caf9">📄 Guía Salida</a>
-    <a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>
-    <a href="/logout">Salir</a>
+    {% if rol == 'admin' %}<a href="/reposicion">🛒 Reposición</a>{% endif %}
+    {% if rol == 'admin' %}<a href="/facturas">🧾 Facturas</a>{% endif %}
+    <a href="/guia">📄 Guía Salida</a>
+    {% if rol in ('admin','operador') %}<a href="/guia_entrada">📥 Guía Entrada</a>{% endif %}
+  </div>
+  <div class="topbar-right">
+    <span class="user-pill">👤 {{ user }}</span>
+    <button class="btn-logout" onclick="location='/logout'">Salir</button>
   </div>
 </div>
 
@@ -88,7 +98,7 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
   <div class="sec">Resumen general</div>
   <div class="kpi-grid">
     <div class="kpi"><div class="kpi-icon" style="background:#E2EFDA">📦</div><div><div class="kpi-n" id="k-prod">—</div><div class="kpi-l">Productos activos</div></div></div>
-    <div class="kpi"><div class="kpi-icon" style="background:#FCEBEB">⚠️</div><div><div class="kpi-n" id="k-alert" style="color:#C00">—</div><div class="kpi-l">Bajo stock mínimo</div></div></div>
+    <div class="kpi"><div class="kpi-icon" style="background:#FADFDF">⚠️</div><div><div class="kpi-n" id="k-alert" style="color:#9B1C1C">—</div><div class="kpi-l">Bajo stock mínimo</div></div></div>
     <div class="kpi"><div class="kpi-icon" style="background:#E6F1FB">📥</div><div><div class="kpi-n" id="k-ent">—</div><div class="kpi-l">Total entradas</div></div></div>
     <div class="kpi"><div class="kpi-icon" style="background:#FCE4D6">📤</div><div><div class="kpi-n" id="k-sal">—</div><div class="kpi-l">Total salidas</div></div></div>
   </div>
@@ -138,7 +148,7 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
           <option value="12">Diciembre</option>
         </select>
       </div>
-      <div style="display:flex;align-items:center;color:#999;font-size:13px;padding-bottom:2px">— o rango —</div>
+      <div style="display:flex;align-items:center;color:#5E7B6E;font-size:13px;padding-bottom:2px">— o rango —</div>
       <div class="filtro-group">
         <label>Desde</label>
         <input type="date" id="f-desde">
@@ -164,7 +174,7 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
     <div class="sec" id="filtro-sec-title">Resultados del período</div>
     <div class="resultado-grid">
       <div class="res-card"><div class="res-n" id="r-entradas" style="color:#0D4F3C">—</div><div class="res-l">Total entradas</div></div>
-      <div class="res-card"><div class="res-n" id="r-salidas" style="color:#C00">—</div><div class="res-l">Total salidas</div></div>
+      <div class="res-card"><div class="res-n" id="r-salidas" style="color:#9B1C1C">—</div><div class="res-l">Total salidas</div></div>
       <div class="res-card"><div class="res-n" id="r-diferencia" style="color:#2E74B5">—</div><div class="res-l">Diferencia neta</div></div>
     </div>
     <div class="charts-2">
@@ -231,10 +241,10 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
 <div class="modal-bg" id="modal-import">
   <div class="modal">
     <h3>📤 Importar productos desde Excel</h3>
-    <p style="font-size:13px;color:#555;margin-bottom:14px">Usa la plantilla <strong>PLANTILLA_BODEGA_ASEO.xlsx</strong> — hoja <strong>PRODUCTOS</strong></p>
+    <p style="font-size:13px;color:#5E7B6E;margin-bottom:14px">Usa la plantilla <strong>PLANTILLA_BODEGA_ASEO.xlsx</strong> — hoja <strong>PRODUCTOS</strong></p>
     <div class="upload-area" onclick="document.getElementById('imp-input').click()">
       <input type="file" id="imp-input" accept=".xlsx,.xls" style="display:none" onchange="previewImport()">
-      <div id="imp-label">📊 <strong>Haz click para seleccionar el archivo</strong><br><small style="color:#888">.xlsx — máx 10MB</small></div>
+      <div id="imp-label">📊 <strong>Haz click para seleccionar el archivo</strong><br><small style="color:#5E7B6E">.xlsx — máx 10MB</small></div>
     </div>
     <div id="imp-status" style="font-size:13px;margin-top:10px;text-align:center"></div>
     <div class="modal-btns">
@@ -307,9 +317,9 @@ async function cargarGeneral(){
   const alertas = kpis.alertas||[];
   document.getElementById('alertas-list').innerHTML = alertas.length
     ? alertas.map(a=>`<div class="alerta">
-        <div><div style="font-weight:700;font-size:13px;color:#C00">⚠️ ${a.nombre}</div>
-        <div style="font-size:12px;color:#888">${a.categoria} · Mínimo: ${a.stock_minimo} ${a.unidad}</div></div>
-        <div style="font-size:18px;font-weight:700;color:#C00">${a.stock_actual} ${a.unidad}</div>
+        <div><div style="font-weight:700;font-size:13px;color:#9B1C1C">⚠️ ${a.nombre}</div>
+        <div style="font-size:12px;color:#5E7B6E">${a.categoria} · Mínimo: ${a.stock_minimo} ${a.unidad}</div></div>
+        <div style="font-size:18px;font-weight:700;color:#9B1C1C">${a.stock_actual} ${a.unidad}</div>
       </div>`).join('')
     : '<div class="loading" style="padding:12px">✅ Todos los productos sobre el stock mínimo</div>';
 
@@ -318,7 +328,7 @@ async function cargarGeneral(){
       <td style="font-weight:700;color:#0D4F3C">${i+1}</td>
       <td style="font-weight:600">${p.nombre}</td>
       <td><span class="badge-cat">${p.categoria}</span></td>
-      <td style="font-weight:700;color:${p.stock_actual<=0?'#C00':'#0D4F3C'}">${p.stock_actual} ${p.unidad}</td>
+      <td style="font-weight:700;color:${p.stock_actual<=0?'#9B1C1C':'#0D4F3C'}">${p.stock_actual} ${p.unidad}</td>
       <td style="font-weight:700">${FMT(p.total_salidas)}</td>
     </tr>`).join('');
 }
@@ -337,16 +347,13 @@ async function aplicarFiltro(){
 
   if(mes || anio){
     if(mes && anio){
-      // Mes y año específico
       params.set('mes', `${mes}-${anio}`);
       textoFiltro = `${meses[parseInt(mes)]} ${anio}`;
     } else if(anio && !mes){
-      // Solo año — filtrar todo el año
       params.set('desde', `01-01-${anio}`);
       params.set('hasta', `31-12-${anio}`);
       textoFiltro = `Año ${anio}`;
     } else if(mes && !anio){
-      // Solo mes — todos los años
       params.set('solo_mes', mes);
       textoFiltro = `${meses[parseInt(mes)]} (todos los años)`;
     }
@@ -370,7 +377,6 @@ async function aplicarFiltro(){
   document.getElementById('r-salidas').textContent  = FMT(sal);
   document.getElementById('r-diferencia').textContent = FMT(ent-sal);
 
-  // Gráfico edificio filtrado
   if(chartFEd){ chartFEd.destroy(); }
   const eds = d.por_edificio||[];
   chartFEd = new Chart(document.getElementById('ch-f-ed'),{
@@ -379,7 +385,6 @@ async function aplicarFiltro(){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}}
   });
 
-  // Gráfico productos filtrado
   if(chartFProd){ chartFProd.destroy(); }
   const prods = (d.por_producto||[]).slice(0,10);
   chartFProd = new Chart(document.getElementById('ch-f-prod'),{
@@ -388,7 +393,6 @@ async function aplicarFiltro(){
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{font:{size:10}}},y:{ticks:{font:{size:9}}}}}
   });
 
-  // Tabla detalle
   document.getElementById('tabla-detalle').innerHTML = d.detalle.length
     ? d.detalle.map(m=>`<tr>
         <td>${m.fecha||'—'}</td>
@@ -396,7 +400,7 @@ async function aplicarFiltro(){
         <td style="font-weight:600">${m.nombre}</td>
         <td>${FMT(m.cantidad)} ${m.unidad}</td>
         <td>${m.edificio||'—'}</td>
-        <td style="color:#888">${m.usuario||'—'}</td>
+        <td style="color:#5E7B6E">${m.usuario||'—'}</td>
       </tr>`).join('')
     : '<tr><td colspan="6" class="loading">Sin movimientos en este período</td></tr>';
 }
@@ -442,7 +446,6 @@ async function ejecutarImport(){
   }
 }
 
-
 let archivoImportMov = null;
 function previewImportMov(){
   const file = document.getElementById('imp-mov-input').files[0];
@@ -479,11 +482,11 @@ cargarGeneral();
 <div class="modal-bg" id="modal-import-mov">
   <div class="modal">
     <h3>📋 Importar movimientos históricos</h3>
-    <p style="font-size:13px;color:#555;margin-bottom:10px">
+    <p style="font-size:13px;color:#5E7B6E;margin-bottom:10px">
       Usa la plantilla <strong>PLANTILLA_MOVIMIENTOS_BODEGA.xlsx</strong><br>
       Permite cargar entradas y salidas históricas de una vez.
     </p>
-    <div style="background:#E2EFDA;border-radius:8px;padding:10px;font-size:12px;color:#27500A;margin-bottom:12px">
+    <div style="background:#D4EDDB;border-radius:8px;padding:10px;font-size:12px;color:#1A5C32;margin-bottom:12px">
       ✅ El stock se actualiza automáticamente con cada movimiento importado<br>
       ✅ Los productos deben existir previamente en el sistema<br>
       ✅ Usa exactamente el mismo nombre del producto que en el sistema
@@ -491,7 +494,7 @@ cargarGeneral();
     <div class="upload-area" onclick="document.getElementById('imp-mov-input').click()">
       <input type="file" id="imp-mov-input" accept=".xlsx,.xls" style="display:none" onchange="previewImportMov()">
       <div id="imp-mov-label">📋 <strong>Haz click para seleccionar el archivo</strong><br>
-      <small style="color:#888">.xlsx — Hoja MOVIMIENTOS</small></div>
+      <small style="color:#5E7B6E">.xlsx — Hoja MOVIMIENTOS</small></div>
     </div>
     <div id="imp-mov-status" style="font-size:13px;margin-top:10px;text-align:center"></div>
     <div class="modal-btns">
