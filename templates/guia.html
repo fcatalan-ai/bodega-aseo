@@ -381,7 +381,7 @@ async function emitirGuia(){
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        id: guiaId, responsable, edificio, fecha: fechaFmt, observacion: obs,
+        guia_id: guiaId, responsable, edificio, fecha: fechaFmt, observacion: obs,
         items: items.map(it=>({
           nombre: it.nombre,
           cantidad: it.cantidad,
