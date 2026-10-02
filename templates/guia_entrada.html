@@ -102,6 +102,8 @@ input.price-inp{text-align:right;max-width:110px}
 .hist-card-head .hprov{font-size:.85rem;color:#fff;font-weight:600;flex:1}
 .hist-card-head .htotal{font-size:.85rem;color:var(--verde);font-weight:700;text-align:right}
 .hist-card-head .harrow{color:#444;font-size:.75rem;transition:transform .2s}
+.btn-eliminar-guia{background:none;border:none;cursor:pointer;font-size:.9rem;padding:2px 6px;border-radius:5px;color:#c44;opacity:.6;transition:opacity .15s,background .15s;line-height:1}
+.btn-eliminar-guia:hover{opacity:1;background:rgba(200,50,50,.15)}
 .hist-card-head.open .harrow{transform:rotate(90deg)}
 .hist-card-body{display:none;padding:12px 16px;border-top:1px solid var(--borde)}
 .hist-card-body.open{display:block}
@@ -605,10 +607,6 @@ function renderGuiaCard(g) {
       </table>
     </div>` : '<p style="color:#555;font-size:.78rem">Sin detalle de items</p>';
 
-  const puedeEliminar = origen === 'manual';
-  const btnElim = puedeEliminar
-    ? `<button class="btn-sm btn-danger" onclick="eliminarGuia(${g.id}, event)">🗑 Eliminar</button>`
-    : `<span style="font-size:.72rem;color:#555">Factura: eliminar desde /facturas</span>`;
   const btnPdf = g.cloudinary_url
     ? `<a href="${g.cloudinary_url}" target="_blank" class="btn-sm" style="background:#1e2a4a;color:#90caf9;border:1px solid #2a3a6a;text-decoration:none;padding:5px 10px;border-radius:6px;font-size:.75rem;font-weight:600">📄 Ver PDF</a>`
     : '';
@@ -621,13 +619,14 @@ function renderGuiaCard(g) {
         <span class="hfecha">${g.fecha || '—'}</span>
         <span class="hprov">${g.proveedor || '—'}</span>
         <span class="htotal">$${total}</span>
+        <button class="btn-eliminar-guia" onclick="eliminarGuia(${g.id}, event)" title="Eliminar entrada">🗑</button>
         <span class="harrow">▶</span>
       </div>
       <div class="hist-card-body" id="hbody-${g.id}">
         ${itemsHtml}
         <div class="hist-foot">
           <span class="obs">${g.observacion ? '📝 ' + g.observacion : ''} ${g.usuario ? '· 👤 '+g.usuario : ''}</span>
-          <div class="hactions">${btnPdf}${btnElim}</div>
+          <div class="hactions">${btnPdf}</div>
         </div>
       </div>
     </div>`;
@@ -642,7 +641,7 @@ function toggleHistCard(id, headEl) {
 
 async function eliminarGuia(id, e) {
   e.stopPropagation();
-  if (!confirm('¿Eliminar esta entrada? Se revertirá el stock de los productos.')) return;
+  if (!confirm('¿Eliminar esta entrada?\n\nSe revertirá el stock de los productos involucrados.')) return;
   try {
     const r = await fetch(`/api/guias_entrada/${id}`, { method: 'DELETE' });
     const data = await r.json();
