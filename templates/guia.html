@@ -5,82 +5,91 @@
 <title>Guía de Salida — Bodega Aseo</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
-.topbar{background:#0D4F3C;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
-.topbar h1{font-size:16px;font-weight:700}
-.topbar-links{display:flex;gap:14px;font-size:13px}
-.topbar-links a{color:#A8D5C5;text-decoration:none}
-.topbar-links a:hover{color:#fff}
-.topbar-links a.active{color:#FFD966;font-weight:600}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF3F0;min-height:100vh;color:#1C2E26;font-size:14px}
+.topbar{background:#0D4F3C;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:50;box-shadow:0 2px 10px rgba(0,0,0,0.18)}
+.topbar-logo{font-weight:700;font-size:15px;color:#fff;line-height:1.2;white-space:nowrap}
+.topbar-logo span{display:block;font-size:11px;color:#98D4BC;font-weight:400}
+.topbar-links{display:flex;gap:2px;align-items:center}
+.topbar-links a{color:#B2CEC4;text-decoration:none;font-size:13px;padding:6px 10px;border-radius:7px;transition:.15s;white-space:nowrap}
+.topbar-links a:hover{background:rgba(255,255,255,0.13);color:#fff}
+.topbar-links a.active{color:#fff;font-weight:600;background:rgba(255,255,255,0.15)}
+.topbar-right{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.topbar-right .user-pill{color:#98D4BC;font-size:12px}
+.btn-logout{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.22);padding:5px 14px;border-radius:7px;font-size:12px;cursor:pointer;transition:.15s}
+.btn-logout:hover{background:rgba(255,255,255,0.22)}
 .main{padding:16px;max-width:900px;margin:0 auto}
-.card{background:#fff;border-radius:10px;border:1px solid #e5e8ed;padding:20px;margin-bottom:16px}
-.card-title{font-size:13px;font-weight:700;color:#0D4F3C;text-transform:uppercase;letter-spacing:.05em;margin-bottom:16px;border-bottom:1px solid #f0f0f0;padding-bottom:8px}
+.card{background:#fff;border-radius:12px;border:1px solid #D4E4DC;box-shadow:0 1px 4px rgba(13,79,60,0.06);padding:20px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:700;color:#0D4F3C;text-transform:uppercase;letter-spacing:.05em;margin-bottom:16px;border-bottom:1px solid #EEF3F0;padding-bottom:8px}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 @media(max-width:560px){.form-row{grid-template-columns:1fr}}
-.form-group label{font-size:12px;color:#666;display:block;margin-bottom:4px}
-.form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px}
+.form-group label{font-size:12px;color:#5E7B6E;display:block;margin-bottom:4px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 10px;border:1px solid #D4E4DC;border-radius:7px;font-size:13px;color:#1C2E26;background:#fff}
 .form-group input:focus,.form-group select:focus{outline:none;border-color:#0D4F3C}
 /* Tabla de items */
-.items-header{display:grid;grid-template-columns:1fr 90px 38px;gap:8px;padding:0 0 6px;border-bottom:1px solid #eee;margin-bottom:8px}
-.items-header span{font-size:11px;font-weight:700;color:#999;text-transform:uppercase}
+.items-header{display:grid;grid-template-columns:1fr 90px 38px;gap:8px;padding:0 0 6px;border-bottom:1px solid #EEF3F0;margin-bottom:8px}
+.items-header span{font-size:11px;font-weight:700;color:#5E7B6E;text-transform:uppercase}
 .item-row{display:grid;grid-template-columns:1fr 90px 38px;gap:8px;margin-bottom:8px;align-items:center}
-.item-row select,.item-row input{padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%}
+.item-row select,.item-row input{padding:7px 10px;border:1px solid #D4E4DC;border-radius:7px;font-size:13px;width:100%;color:#1C2E26}
 .item-row select:focus,.item-row input:focus{outline:none;border-color:#0D4F3C}
-.btn-rm{background:#fff;border:1px solid #fcc;color:#c00;border-radius:7px;width:34px;height:34px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.btn-rm:hover{background:#FCEBEB}
+.btn-rm{background:#fff;border:1px solid #F5BCBC;color:#9B1C1C;border-radius:7px;width:34px;height:34px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.btn-rm:hover{background:#FDECEA}
 .btn-add{background:#fff;color:#0D4F3C;border:1px dashed #0D4F3C;padding:7px 16px;border-radius:7px;font-size:13px;cursor:pointer;margin-top:4px}
-.btn-add:hover{background:#f0f7f4}
+.btn-add:hover{background:#F0F7F3}
 .btn-green{background:#0D4F3C;color:#fff;border:none;padding:9px 22px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
 .btn-green:hover{background:#1a6b52}
-.btn-out{background:#fff;color:#555;border:1px solid #ddd;padding:9px 18px;border-radius:8px;font-size:13px;cursor:pointer}
-.btn-out:hover{background:#f5f5f5}
+.btn-out{background:#fff;color:#5E7B6E;border:1px solid #D4E4DC;padding:9px 18px;border-radius:8px;font-size:13px;cursor:pointer}
+.btn-out:hover{background:#EEF3F0}
 .btn-row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
 /* Guías emitidas */
-.guia-item{border:1px solid #e5e8ed;border-radius:8px;padding:14px;margin-bottom:10px}
+.guia-item{border:1px solid #D4E4DC;border-radius:8px;padding:14px;margin-bottom:10px}
 .guia-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px}
-.guia-id{font-size:12px;font-weight:700;color:#0D4F3C;background:#E2EFDA;padding:2px 10px;border-radius:20px}
-.guia-meta{font-size:12px;color:#555;margin-bottom:8px}
-.guia-meta strong{color:#222}
+.guia-id{font-size:12px;font-weight:700;color:#0D4F3C;background:#D4EDDB;padding:2px 10px;border-radius:20px}
+.guia-meta{font-size:12px;color:#5E7B6E;margin-bottom:8px}
+.guia-meta strong{color:#1C2E26}
 .chips{display:flex;flex-wrap:wrap;gap:5px}
-.chip{background:#f0f7f4;border:1px solid #c8e6d0;color:#1a6b52;border-radius:20px;padding:3px 10px;font-size:12px}
-.loading{text-align:center;padding:30px;color:#999;font-size:13px}
-.empty-guias{text-align:center;padding:30px;color:#aaa;font-size:13px}
-.btn-del-guia{background:#fff;border:1px solid #fcc;color:#c00;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
-.btn-del-guia:hover{background:#FCEBEB}
+.chip{background:#F0F7F3;border:1px solid #A8D5B5;color:#1a6b52;border-radius:20px;padding:3px 10px;font-size:12px}
+.loading{text-align:center;padding:30px;color:#5E7B6E;font-size:13px}
+.empty-guias{text-align:center;padding:30px;color:#5E7B6E;font-size:13px}
+.btn-del-guia{background:#fff;border:1px solid #F5BCBC;color:#9B1C1C;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
+.btn-del-guia:hover{background:#FDECEA}
 /* Alerta stock */
-.stock-warn{background:#FCEBEB;border:1px solid #f5a0a0;border-radius:7px;padding:10px 14px;font-size:13px;color:#791F1F;margin-bottom:12px;display:none}
+.stock-warn{background:#FDECEA;border:1px solid #F5BCBC;border-radius:7px;padding:10px 14px;font-size:13px;color:#9B1C1C;margin-bottom:12px;display:none}
 /* Canvas firma */
 .firma-wrap{margin-top:16px;margin-bottom:8px}
-.firma-label{font-size:12px;color:#666;font-weight:600;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.firma-label{font-size:12px;color:#5E7B6E;font-weight:600;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
 .canvas-firma{display:block;width:100%;border:1.5px solid #0D4F3C;border-radius:8px;background:#fff;touch-action:none;cursor:crosshair}
-.btn-clear-firma{background:#fff;border:1px solid #ddd;color:#888;padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer}
-.btn-clear-firma:hover{background:#f5f5f5;color:#333}
-.firma-hint{font-size:11px;color:#aaa;margin-top:4px;text-align:center}
+.btn-clear-firma{background:#fff;border:1px solid #D4E4DC;color:#5E7B6E;padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer}
+.btn-clear-firma:hover{background:#EEF3F0;color:#1C2E26}
+.firma-hint{font-size:11px;color:#5E7B6E;margin-top:4px;text-align:center}
 /* Panel PDF resultado */
-.pdf-result{display:none;background:#E2EFDA;border:1.5px solid #27500A;border-radius:10px;padding:18px;margin-top:14px;text-align:center}
+.pdf-result{display:none;background:#D4EDDB;border:1.5px solid #1A5C32;border-radius:10px;padding:18px;margin-top:14px;text-align:center}
 .pdf-result.show{display:block}
 .pdf-result .pdf-id{font-size:18px;font-weight:800;color:#0D4F3C;margin-bottom:4px}
-.pdf-result .pdf-sub{font-size:13px;color:#555;margin-bottom:14px}
+.pdf-result .pdf-sub{font-size:13px;color:#5E7B6E;margin-bottom:14px}
 .pdf-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .btn-pdf{background:#0D4F3C;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
 .btn-pdf:hover{background:#1a6b52}
 .btn-wa{background:#25D366;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
 .btn-wa:hover{background:#1eb857}
-.btn-mail{background:#555;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
-.btn-mail:hover{background:#333}
+.btn-mail{background:#5E7B6E;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn-mail:hover{background:#3d5a50}
 </style>
 </head>
 <body>
 <div class="topbar">
-  <h1>🧴 Bodega de Aseo — Guía de Salida</h1>
+  <div class="topbar-logo">🧴 Bodega Aseo<span>Colegio Centenario de Temuco</span></div>
   <div class="topbar-links">
-    <a href="/">📦 Inventario</a>
+    <a href="/">🏠 Inventario</a>
     {% if rol == 'admin' %}<a href="/dashboard">📊 Dashboard</a>{% endif %}
     <a href="/movimientos">📋 Movimientos</a>
-    {% if rol == 'admin' %}<a href="/reposicion" style="color:#FFD966">🛒 Reposición</a>{% endif %}
+    {% if rol == 'admin' %}<a href="/reposicion">🛒 Reposición</a>{% endif %}
+    {% if rol == 'admin' %}<a href="/facturas">🧾 Facturas</a>{% endif %}
     <a href="/guia" class="active">📄 Guía Salida</a>
-    {% if rol in ('admin','operador') %}<a href="/guia_entrada" style="color:#98e6b0">📥 Guía Entrada</a>{% endif %}
-    <a href="/logout">Salir</a>
+    {% if rol in ('admin','operador') %}<a href="/guia_entrada">📥 Guía Entrada</a>{% endif %}
+  </div>
+  <div class="topbar-right">
+    <span class="user-pill">👤 {{ user }}</span>
+    <button class="btn-logout" onclick="location='/logout'">Salir</button>
   </div>
 </div>
 
@@ -160,7 +169,7 @@ body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh}
   <div class="card">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>📋 Guías Emitidas</span>
-      <span id="guias-count" style="font-size:12px;color:#888;text-transform:none;font-weight:400"></span>
+      <span id="guias-count" style="font-size:12px;color:#5E7B6E;text-transform:none;font-weight:400"></span>
     </div>
     <div id="guias-lista"><div class="loading">Cargando...</div></div>
   </div>
@@ -186,9 +195,9 @@ function crearSelectProducto(val=''){
   const inp = document.createElement('input');
   inp.type='text'; inp.placeholder='Buscar producto...';
   inp.value = val||''; inp.autocomplete = 'off';
-  inp.style.cssText = 'width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px';
+  inp.style.cssText = 'width:100%;padding:7px 10px;border:1px solid #D4E4DC;border-radius:7px;font-size:13px;color:#1C2E26';
   const dd = document.createElement('div');
-  dd.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:0 0 7px 7px;max-height:180px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.1)';
+  dd.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #D4E4DC;border-radius:0 0 7px 7px;max-height:180px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.1)';
   inp.oninput = ()=>{
     const q = inp.value.toLowerCase().trim();
     if(!q){ dd.style.display='none'; return; }
@@ -198,9 +207,9 @@ function crearSelectProducto(val=''){
     matches.slice(0,8).forEach(p=>{
       const bajo = p.stock_actual <= (p.stock_minimo||0);
       const item = document.createElement('div');
-      item.style.cssText = 'padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center';
-      item.innerHTML = `<span>${p.nombre}</span><span style="font-size:11px;color:${bajo?'#c00':'#888'};font-weight:${bajo?'700':'400'}">${p.stock_actual} ${p.unidad}${bajo?' ⚠️':''}</span>`;
-      item.addEventListener('mouseover', ()=>item.style.background='#f0f7f4');
+      item.style.cssText = 'padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #EEF3F0;display:flex;justify-content:space-between;align-items:center';
+      item.innerHTML = `<span>${p.nombre}</span><span style="font-size:11px;color:${bajo?'#9B1C1C':'#5E7B6E'};font-weight:${bajo?'700':'400'}">${p.stock_actual} ${p.unidad}${bajo?' ⚠️':''}</span>`;
+      item.addEventListener('mouseover', ()=>item.style.background='#F0F7F3');
       item.addEventListener('mouseout',  ()=>item.style.background='');
       item.addEventListener('mousedown', (e)=>{ e.preventDefault(); inp.value = p.nombre; dd.style.display='none'; inp.blur(); });
       dd.appendChild(item);
@@ -218,7 +227,7 @@ function crearSelectProducto(val=''){
     else if(e.key==='Enter'){ e.preventDefault(); if(idxSel>=0) items[idxSel].dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); return; }
     else if(e.key==='Escape'){ dd.style.display='none'; idxSel=-1; return; }
     else { idxSel=-1; return; }
-    items.forEach((it,i)=>{ it.style.background = i===idxSel ? '#c8e6d0' : ''; });
+    items.forEach((it,i)=>{ it.style.background = i===idxSel ? '#A8D5B5' : ''; });
   });
   wrap.appendChild(inp); wrap.appendChild(dd);
   return wrap;
@@ -231,7 +240,7 @@ function addFila(producto='', cantidad=''){
   const sel = crearSelectProducto(producto);
   const inp = document.createElement('input');
   inp.type='number'; inp.min='1'; inp.placeholder='Cant.'; inp.value=cantidad||'';
-  inp.style.cssText='padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%';
+  inp.style.cssText='padding:7px 10px;border:1px solid #D4E4DC;border-radius:7px;font-size:13px;width:100%;color:#1C2E26';
   const btn = document.createElement('button');
   btn.className='btn-rm'; btn.textContent='×';
   btn.onclick=()=>{ if(container.children.length>1) row.remove(); else { inp.value=''; } };
@@ -263,7 +272,6 @@ let _pdfB64 = null, _pdfNombre = null;
   function resize(){
     const old = canvas.toDataURL();
     canvas.width = canvas.offsetWidth;
-    // Restaurar contenido
     const img = new Image();
     img.onload = ()=>ctx.drawImage(img, 0, 0);
     img.src = old;
@@ -328,7 +336,6 @@ async function emitirGuia(){
   });
   if(!items.length){ alert('Agrega al menos un producto con cantidad válida'); return; }
 
-  // Verificar stock
   await cargarStock();
   const errores = [];
   items.forEach(it=>{
@@ -346,13 +353,11 @@ async function emitirGuia(){
   }
   document.getElementById('stock-warn').style.display='none';
 
-  // Firma (opcional)
   let firma_b64 = null;
   if(!firmaEstaVacia()){
     firma_b64 = document.getElementById('canvas-firma').toDataURL('image/png');
   }
 
-  // Registrar movimientos
   const fechaFmt = fecha ? fecha.split('-').reverse().join('-') : new Date().toLocaleDateString('es-CL').replace(/\//g,'-');
   const btn = document.getElementById('btn-emitir');
   btn.disabled = true; btn.textContent = '⏳ Registrando...';
@@ -368,7 +373,6 @@ async function emitirGuia(){
     if(d.error){ alert('Error al registrar "'+it.nombre+'": '+d.error); btn.disabled=false; btn.textContent='📄 Emitir Guía + PDF'; return; }
   }
 
-  // Generar PDF
   const guiaId = 'G-' + Date.now();
   btn.textContent = '📄 Generando PDF...';
 
@@ -389,25 +393,20 @@ async function emitirGuia(){
 
     if(!r.ok){ throw new Error('HTTP '+r.status); }
     const d = await r.json();
-
     if(d.error){ throw new Error(d.error); }
 
-    // Guardar b64 para descarga posterior
     _pdfB64 = d.pdf_b64;
     _pdfNombre = d.nombre || (guiaId + '.pdf');
 
-    // Guardar en localStorage
     const guias = JSON.parse(localStorage.getItem('bodega_guias')||'[]');
     guias.unshift({id:guiaId, fecha:fechaFmt, responsable, edificio, obs, items});
     localStorage.setItem('bodega_guias', JSON.stringify(guias.slice(0,100)));
 
-    // Mostrar resultado
     mostrarResultadoPDF(guiaId, responsable, edificio, fechaFmt, items, obs);
     limpiarFormulario();
     renderGuias();
 
   } catch(e){
-    // Si falla el PDF, igual guardamos la guía
     const guias = JSON.parse(localStorage.getItem('bodega_guias')||'[]');
     guias.unshift({id:guiaId, fecha:fechaFmt, responsable, edificio, obs, items});
     localStorage.setItem('bodega_guias', JSON.stringify(guias.slice(0,100)));
@@ -424,7 +423,6 @@ function mostrarResultadoPDF(guiaId, responsable, edificio, fecha, items, obs){
   document.getElementById('pdf-guia-sub').textContent =
     `${items.length} producto(s) · ${responsable} → ${edificio} · ${fecha}`;
 
-  // Construir texto WhatsApp
   const lineas = items.map(it=>`• ${it.nombre}: ${it.cantidad} ${it.unidad||'un'}`).join('\n');
   const waText = encodeURIComponent(
     `*Guía de Salida Bodega Aseo — ${guiaId}*\n`+
@@ -437,7 +435,6 @@ function mostrarResultadoPDF(guiaId, responsable, edificio, fecha, items, obs){
   );
   document.getElementById('btn-wa').href = `https://wa.me/?text=${waText}`;
 
-  // Construir mailto
   const mailSubject = encodeURIComponent(`Guía de Salida ${guiaId} — Bodega Aseo Colegio Centenario`);
   const mailBody = encodeURIComponent(
     `Guía de Salida — Bodega de Aseo\nColegio Centenario de Temuco\n\n`+
@@ -459,7 +456,6 @@ function descargarPDF(){
   const blob = new Blob([arr], {type:'application/pdf'});
   const url = URL.createObjectURL(blob);
 
-  // iOS: window.open; otros: link de descarga
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   if(isIOS){
     window.open(url, '_blank');
@@ -485,13 +481,13 @@ function renderGuias(){
       <div class="guia-header">
         <div style="display:flex;align-items:center;gap:8px">
           <span class="guia-id">${g.id}</span>
-          <span style="font-size:12px;color:#888">${g.fecha}</span>
+          <span style="font-size:12px;color:#5E7B6E">${g.fecha}</span>
         </div>
         ${ROL_USUARIO==='admin'?`<button class="btn-del-guia" onclick="eliminarGuia(${idx})">🗑️ Eliminar</button>`:''}
       </div>
       <div class="guia-meta">
         <strong>${g.responsable}</strong> → <strong>${g.edificio}</strong>
-        ${g.obs?` · <em style="color:#888">${g.obs}</em>`:''}
+        ${g.obs?` · <em style="color:#5E7B6E">${g.obs}</em>`:''}
       </div>
       <div class="chips">
         ${g.items.map(it=>`<span class="chip">${it.nombre} ×${it.cantidad}</span>`).join('')}
