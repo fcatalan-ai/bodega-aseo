@@ -41,7 +41,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF3F0;min-height:100vh
 .btn-out:hover{background:#EEF3F0}
 .btn-row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
 /* Guías emitidas */
-.guia-item{border:1px solid #D4E4DC;border-radius:8px;padding:14px;margin-bottom:10px}
+.guia-item{border:1px solid #D4E4DC;border-radius:8px;padding:14px;margin-bottom:10px;cursor:pointer;transition:.15s}
+.guia-item:hover{border-color:#A8D5B5;background:#FAFDFB}
 .guia-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px}
 .guia-id{font-size:12px;font-weight:700;color:#0D4F3C;background:#D4EDDB;padding:2px 10px;border-radius:20px}
 .guia-meta{font-size:12px;color:#5E7B6E;margin-bottom:8px}
@@ -50,8 +51,13 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF3F0;min-height:100vh
 .chip{background:#F0F7F3;border:1px solid #A8D5B5;color:#1a6b52;border-radius:20px;padding:3px 10px;font-size:12px}
 .loading{text-align:center;padding:30px;color:#5E7B6E;font-size:13px}
 .empty-guias{text-align:center;padding:30px;color:#5E7B6E;font-size:13px}
+.guia-actions{display:flex;gap:6px;flex-wrap:wrap}
 .btn-del-guia{background:#fff;border:1px solid #F5BCBC;color:#9B1C1C;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
 .btn-del-guia:hover{background:#FDECEA}
+.btn-ver-pdf{background:#0D4F3C;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
+.btn-ver-pdf:hover{background:#1a6b52}
+.btn-edit-guia{background:#fff;color:#0D4F3C;border:1px solid #0D4F3C;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
+.btn-edit-guia:hover{background:#F0F7F3}
 /* Alerta stock */
 .stock-warn{background:#FDECEA;border:1px solid #F5BCBC;border-radius:7px;padding:10px 14px;font-size:13px;color:#9B1C1C;margin-bottom:12px;display:none}
 /* Canvas firma */
@@ -73,6 +79,12 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF3F0;min-height:100vh
 .btn-wa:hover{background:#1eb857}
 .btn-mail{background:#5E7B6E;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
 .btn-mail:hover{background:#3d5a50}
+/* Modal edición */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal-box{background:#fff;border-radius:12px;padding:24px;width:min(460px,94vw);box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+.modal-title{font-size:15px;font-weight:700;color:#0D4F3C;margin-bottom:16px}
+.modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
 </style>
 </head>
 <body>
@@ -174,6 +186,32 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF3F0;min-height:100vh
     <div id="guias-lista"><div class="loading">Cargando...</div></div>
   </div>
 
+</div>
+
+<!-- MODAL EDICIÓN -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal-box">
+    <div class="modal-title">✏️ Editar Guía de Salida</div>
+    <input type="hidden" id="edit-id">
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Responsable del retiro</label>
+      <input type="text" id="edit-responsable">
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Edificio de destino</label>
+      <select id="edit-edificio">
+        {% for e in edificios %}<option>{{ e }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Observaciones</label>
+      <input type="text" id="edit-obs" placeholder="Opcional...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-out" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-green" onclick="guardarEdicion()">💾 Guardar</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -317,6 +355,24 @@ function firmaEstaVacia(){
   return true;
 }
 
+/* ─── Abrir PDF en nueva pestaña ─── */
+function abrirPDFEnPestana(b64, nombre){
+  const bytes = atob(b64);
+  const arr = new Uint8Array(bytes.length);
+  for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+  const blob = new Blob([arr], {type:'application/pdf'});
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank');
+  // En iOS el blob URL puede no abrir, fallback a descarga
+  if(!win || win.closed || typeof win.closed==='undefined'){
+    const a = document.createElement('a');
+    a.href = url; a.download = nombre || 'guia.pdf';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>document.body.removeChild(a), 1000);
+  }
+  setTimeout(()=>URL.revokeObjectURL(url), 30000);
+}
+
 /* ─── Emitir guía ─── */
 async function emitirGuia(){
   const responsable = document.getElementById('g-responsable').value.trim();
@@ -362,6 +418,7 @@ async function emitirGuia(){
   const btn = document.getElementById('btn-emitir');
   btn.disabled = true; btn.textContent = '⏳ Registrando...';
 
+  // 1) Registrar movimientos de stock
   for(const it of items){
     const s = stockMap[it.nombre];
     const data = {
@@ -376,6 +433,8 @@ async function emitirGuia(){
   const guiaId = 'G-' + Date.now();
   btn.textContent = '📄 Generando PDF...';
 
+  // 2) Generar PDF
+  let pdfB64 = null, pdfNombre = null;
   try {
     const r = await fetch('/api/guias/pdf', {
       method: 'POST',
@@ -387,7 +446,7 @@ async function emitirGuia(){
           cantidad: it.cantidad,
           unidad: (stockMap[it.nombre]?.unidad||'un'),
         })),
-        firma_b64,
+        firma: firma_b64,
       })
     });
 
@@ -395,25 +454,49 @@ async function emitirGuia(){
     const d = await r.json();
     if(d.error){ throw new Error(d.error); }
 
-    _pdfB64 = d.pdf_b64;
-    _pdfNombre = d.nombre || (guiaId + '.pdf');
+    pdfB64    = d.pdf_b64;
+    pdfNombre = d.nombre || (guiaId + '.pdf');
+    _pdfB64   = pdfB64;
+    _pdfNombre= pdfNombre;
 
-    const guias = JSON.parse(localStorage.getItem('bodega_guias')||'[]');
-    guias.unshift({id:guiaId, fecha:fechaFmt, responsable, edificio, obs, items});
-    localStorage.setItem('bodega_guias', JSON.stringify(guias.slice(0,100)));
-
-    mostrarResultadoPDF(guiaId, responsable, edificio, fechaFmt, items, obs);
-    limpiarFormulario();
-    renderGuias();
+    // 3) Abrir PDF automáticamente en nueva pestaña
+    abrirPDFEnPestana(pdfB64, pdfNombre);
 
   } catch(e){
-    const guias = JSON.parse(localStorage.getItem('bodega_guias')||'[]');
-    guias.unshift({id:guiaId, fecha:fechaFmt, responsable, edificio, obs, items});
-    localStorage.setItem('bodega_guias', JSON.stringify(guias.slice(0,100)));
-    alert('✅ Guía '+guiaId+' emitida.\n(No se pudo generar el PDF: '+e.message+')');
-    limpiarFormulario();
-    renderGuias();
+    console.warn('PDF generation failed:', e);
   }
+
+  // 4) Guardar en backend (con PDF b64 para Cloudinary)
+  btn.textContent = '💾 Guardando...';
+  try {
+    const itemsConUnidad = items.map(it=>({
+      nombre: it.nombre,
+      cantidad: it.cantidad,
+      unidad: (stockMap[it.nombre]?.unidad||'un'),
+    }));
+    await fetch('/api/guias_salida', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        guia_id: guiaId, fecha: fechaFmt, responsable, edificio,
+        observacion: obs, items: itemsConUnidad,
+        pdf_b64: pdfB64 || '',
+      })
+    });
+  } catch(e){
+    console.warn('Save to backend failed:', e);
+  }
+
+  // 5) Mostrar panel y limpiar
+  if(pdfB64){
+    mostrarResultadoPDF(guiaId, responsable, edificio, fechaFmt,
+      items.map(it=>({...it, unidad: stockMap[it.nombre]?.unidad||'un'})), obs);
+  } else {
+    alert('✅ Guía '+guiaId+' emitida (sin PDF disponible).');
+    document.getElementById('pdf-result').classList.remove('show');
+  }
+  limpiarFormulario();
+  renderGuias();
 
   btn.disabled = false; btn.textContent = '📄 Emitir Guía + PDF';
 }
@@ -450,59 +533,127 @@ function mostrarResultadoPDF(guiaId, responsable, edificio, fecha, items, obs){
 
 function descargarPDF(){
   if(!_pdfB64){ alert('No hay PDF disponible.'); return; }
-  const bytes = atob(_pdfB64);
-  const arr = new Uint8Array(bytes.length);
-  for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
-  const blob = new Blob([arr], {type:'application/pdf'});
-  const url = URL.createObjectURL(blob);
-
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  if(isIOS){
-    window.open(url, '_blank');
-  } else {
-    const a = document.createElement('a');
-    a.href = url; a.download = _pdfNombre || 'guia.pdf';
-    document.body.appendChild(a); a.click();
-    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
-  }
+  abrirPDFEnPestana(_pdfB64, _pdfNombre);
 }
 
-/* ─── Historial local ─── */
-function renderGuias(){
-  const guias = JSON.parse(localStorage.getItem('bodega_guias')||'[]');
+/* ─── Guías Emitidas (backend) ─── */
+async function renderGuias(){
   const container = document.getElementById('guias-lista');
+  container.innerHTML = '<div class="loading">Cargando...</div>';
+  let guias = [];
+  try {
+    const r = await fetch('/api/guias_salida');
+    guias = await r.json();
+  } catch(e){
+    container.innerHTML = '<div class="empty-guias">Error al cargar guías.</div>';
+    return;
+  }
   document.getElementById('guias-count').textContent = guias.length ? `${guias.length} guía(s)` : '';
   if(!guias.length){
     container.innerHTML='<div class="empty-guias">No hay guías emitidas aún</div>';
     return;
   }
-  container.innerHTML = guias.map((g,idx)=>`
+  container.innerHTML = guias.map(g=>`
     <div class="guia-item">
       <div class="guia-header">
         <div style="display:flex;align-items:center;gap:8px">
-          <span class="guia-id">${g.id}</span>
-          <span style="font-size:12px;color:#5E7B6E">${g.fecha}</span>
+          <span class="guia-id">${g.guia_id||'—'}</span>
+          <span style="font-size:12px;color:#5E7B6E">${g.fecha||''}</span>
         </div>
-        ${ROL_USUARIO==='admin'?`<button class="btn-del-guia" onclick="eliminarGuia(${idx})">🗑️ Eliminar</button>`:''}
+        <div class="guia-actions">
+          <button class="btn-ver-pdf" onclick="verPDF(${g.id},event)">📄 Ver PDF</button>
+          <button class="btn-edit-guia" onclick="abrirEdicion(${g.id},'${esc(g.responsable)}','${esc(g.edificio)}','${esc(g.observacion||'')}',event)">✏️ Editar</button>
+          ${ROL_USUARIO==='admin'?`<button class="btn-del-guia" onclick="eliminarGuia(${g.id},event)">🗑️</button>`:''}
+        </div>
       </div>
       <div class="guia-meta">
-        <strong>${g.responsable}</strong> → <strong>${g.edificio}</strong>
-        ${g.obs?` · <em style="color:#5E7B6E">${g.obs}</em>`:''}
+        <strong>${g.responsable||'—'}</strong> → <strong>${g.edificio||'—'}</strong>
+        ${g.observacion?` · <em style="color:#5E7B6E">${g.observacion}</em>`:''}
       </div>
       <div class="chips">
-        ${g.items.map(it=>`<span class="chip">${it.nombre} ×${it.cantidad}</span>`).join('')}
+        ${(g.items||[]).map(it=>`<span class="chip">${it.nombre} ×${it.cantidad}</span>`).join('')}
       </div>
     </div>
   `).join('');
 }
 
-function eliminarGuia(idx){
-  if(!confirm('¿Eliminar este registro de guía? (El stock ya fue descontado y no se revierte)')) return;
-  const guias = JSON.parse(localStorage.getItem('bodega_guias')||'[]');
-  guias.splice(idx,1);
-  localStorage.setItem('bodega_guias', JSON.stringify(guias));
-  renderGuias();
+function esc(s){ return (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+async function verPDF(id, e){
+  if(e){ e.stopPropagation(); }
+  const btn = e?.target;
+  if(btn){ btn.disabled=true; btn.textContent='⏳...'; }
+  try {
+    // Intentar regenerar PDF desde backend
+    const r = await fetch(`/api/guias_salida/${id}/pdf`, {method:'POST'});
+    const d = await r.json();
+    if(d.pdf_b64){
+      abrirPDFEnPestana(d.pdf_b64, d.nombre||'guia.pdf');
+    } else {
+      alert('No se pudo generar el PDF.');
+    }
+  } catch(err){
+    alert('Error al obtener el PDF: '+err.message);
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='📄 Ver PDF'; }
+  }
 }
+
+function abrirEdicion(id, responsable, edificio, obs, e){
+  if(e){ e.stopPropagation(); }
+  document.getElementById('edit-id').value = id;
+  document.getElementById('edit-responsable').value = responsable;
+  document.getElementById('edit-obs').value = obs;
+  // Seleccionar edificio
+  const sel = document.getElementById('edit-edificio');
+  for(let i=0;i<sel.options.length;i++){
+    if(sel.options[i].value === edificio || sel.options[i].text === edificio){
+      sel.selectedIndex = i; break;
+    }
+  }
+  document.getElementById('modal-edit').classList.add('open');
+}
+
+function cerrarModal(){
+  document.getElementById('modal-edit').classList.remove('open');
+}
+
+async function guardarEdicion(){
+  const id          = document.getElementById('edit-id').value;
+  const responsable = document.getElementById('edit-responsable').value.trim();
+  const edificio    = document.getElementById('edit-edificio').value;
+  const obs         = document.getElementById('edit-obs').value.trim();
+  if(!responsable){ alert('Ingresa el responsable'); return; }
+  try {
+    const r = await fetch(`/api/guias_salida/${id}`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({responsable, edificio, observacion: obs})
+    });
+    const d = await r.json();
+    if(!d.ok){ alert('Error al guardar'); return; }
+    cerrarModal();
+    renderGuias();
+  } catch(e){
+    alert('Error: '+e.message);
+  }
+}
+
+async function eliminarGuia(id, e){
+  if(e){ e.stopPropagation(); }
+  if(!confirm('¿Eliminar este registro de guía?\n(El stock ya fue descontado y no se revierte)')) return;
+  try {
+    await fetch(`/api/guias_salida/${id}`,{method:'DELETE'});
+    renderGuias();
+  } catch(err){
+    alert('Error al eliminar: '+err.message);
+  }
+}
+
+// Cerrar modal al click fuera
+document.getElementById('modal-edit').addEventListener('click', function(e){
+  if(e.target === this) cerrarModal();
+});
 
 /* ─── Init ─── */
 document.getElementById('g-fecha').value = new Date().toISOString().split('T')[0];
