@@ -1637,45 +1637,32 @@ def delete_guia_entrada(gid):
     guia = db_fetchone("SELECT items_json, origen FROM guias_entrada WHERE id=?", (gid,))
     if not guia:
         return jsonify({'error': 'No encontrada'}), 404
-    items_json, origen = guia.get('items_json'), guia.get('origen', 'manual')
-    # Si es manual, revertir stock
-    if origen == 'manual':
-        items = []
-        try:
-            items = _json.loads(items_json) if items_json else []
-        except Exception:
-            pass
-        conn2, mode2 = get_db()
-        cur2 = conn2.cursor()
-        try:
-            for item in items:
-                pid  = item.get('producto_id')
-                cant = int(item.get('cantidad', 0))
-                if not pid or cant <= 0:
-                    continue
-                if mode2 == 'pg':
-                    cur2.execute("UPDATE productos SET stock_actual=GREATEST(0,stock_actual-%s) WHERE id=%s", (cant, pid))
-                else:
-                    cur2.execute("UPDATE productos SET stock_actual=MAX(0,stock_actual-?) WHERE id=?", (cant, pid))
+    items_json = guia.get('items_json')
+    items = []
+    try:
+        items = _json.loads(items_json) if items_json else []
+    except Exception:
+        pass
+    conn2, mode2 = get_db()
+    cur2 = conn2.cursor()
+    try:
+        # Revertir stock para todos los items (manual y factura)
+        for item in items:
+            pid  = item.get('producto_id')
+            cant = int(item.get('cantidad', 0))
+            if not pid or cant <= 0:
+                continue
             if mode2 == 'pg':
-                cur2.execute("DELETE FROM guias_entrada WHERE id=%s", (gid,))
+                cur2.execute("UPDATE productos SET stock_actual=GREATEST(0,stock_actual-%s) WHERE id=%s", (cant, pid))
             else:
-                cur2.execute("DELETE FROM guias_entrada WHERE id=?", (gid,))
-            conn2.commit()
-        finally:
-            conn2.close()
-    else:
-        # Solo eliminar registro, no revertir (facturas ya procesadas)
-        conn2, mode2 = get_db()
-        cur2 = conn2.cursor()
-        try:
-            if mode2 == 'pg':
-                cur2.execute("DELETE FROM guias_entrada WHERE id=%s", (gid,))
-            else:
-                cur2.execute("DELETE FROM guias_entrada WHERE id=?", (gid,))
-            conn2.commit()
-        finally:
-            conn2.close()
+                cur2.execute("UPDATE productos SET stock_actual=MAX(0,stock_actual-?) WHERE id=?", (cant, pid))
+        if mode2 == 'pg':
+            cur2.execute("DELETE FROM guias_entrada WHERE id=%s", (gid,))
+        else:
+            cur2.execute("DELETE FROM guias_entrada WHERE id=?", (gid,))
+        conn2.commit()
+    finally:
+        conn2.close()
 
     return jsonify({'ok': True})
 
