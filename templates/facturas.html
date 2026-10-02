@@ -370,6 +370,8 @@ function renderPreview(data) {
     const matchedNombre = row.producto_id
       ? (productosDB.find(p => p.id == row.producto_id)?.nombre || '')
       : '';
+    // Si no hay match en bodega, pre-llenar con el nombre de la factura (editable)
+    const displayNombre = matchedNombre || row.nombre_factura || '';
 
     const tr = document.createElement('tr');
     tr.id = `fila-${i}`;
@@ -381,11 +383,11 @@ function renderPreview(data) {
       <td class="td-num">$${fmt(row.valor)}</td>
       <td>
         <span class="match-dot ${dotColor}" id="dot-${i}"></span>
-        <div class="ac-wrap${matchedNombre ? ' has-val' : ''}" id="acwrap-${i}">
-          <input class="ac-input${!matchedNombre ? ' unassigned' : ''}" id="ac-input-${i}"
+        <div class="ac-wrap has-val" id="acwrap-${i}">
+          <input class="ac-input${matchedNombre ? '' : ' unassigned'}" id="ac-input-${i}"
                  type="text" autocomplete="off" spellcheck="false"
                  placeholder="— Sin asignar —"
-                 value="${matchedNombre}"
+                 value="${displayNombre}"
                  oninput="acFilter(${i})"
                  onfocus="acOpen(${i})"
                  onblur="acBlur(${i})"
@@ -414,6 +416,12 @@ function toggleSkip(i) {
   actualizarInfo();
 }
 
+function tieneValor(i) {
+  const hid = document.getElementById(`prod-${i}`);
+  const inp = document.getElementById(`ac-input-${i}`);
+  return (hid && hid.value) || (inp && inp.value.trim().length > 0);
+}
+
 function actualizarInfo() {
   const rows = parsedData?.rows || [];
   let activos = 0, asignados = 0;
@@ -421,8 +429,7 @@ function actualizarInfo() {
     const fila = document.getElementById(`fila-${i}`);
     if (fila && !fila.classList.contains('fila-skip')) {
       activos++;
-      const hid = document.getElementById(`prod-${i}`);
-      if (hid && hid.value) asignados++;
+      if (tieneValor(i)) asignados++;
     }
   });
   document.getElementById('info-sel').textContent =
@@ -547,7 +554,7 @@ function acBlur(idx) {
       const match = productosDB.find(p =>
         normalizeAC(p.nombre) === normalizeAC(inp.value));
       if (match) acSetValue(idx, match.id, match.nombre);
-      else { inp.value = ''; inp.classList.add('unassigned'); }
+      // Si no coincide, dejar el texto como nombre nuevo (no borrar)
     }
   }, 150);
 }
@@ -676,12 +683,21 @@ async function confirmar() {
   };
 
   const rows = [];
-  (parsedData.rows || []).forEach((_, i) => {
+  (parsedData.rows || []).forEach((row, i) => {
     const fila = document.getElementById(`fila-${i}`);
     if (!fila || fila.classList.contains('fila-skip')) return;
-    const pid  = document.getElementById(`prod-${i}`)?.value;
-    const cant = parseInt(document.getElementById(`cant-${i}`)?.value) || 0;
-    if (pid && cant > 0) rows.push({ producto_id: parseInt(pid), cantidad: cant });
+    const pid      = document.getElementById(`prod-${i}`)?.value;
+    const cant     = parseInt(document.getElementById(`cant-${i}`)?.value) || 0;
+    const textoInput = (document.getElementById(`ac-input-${i}`)?.value || '').trim();
+    if (cant <= 0) return;
+    if (pid) {
+      rows.push({ producto_id: parseInt(pid), cantidad: cant });
+    } else if (textoInput) {
+      // nombre libre: crear producto nuevo con el texto del input
+      rows.push({ nombre_nuevo: textoInput, cantidad: cant,
+                  precio_unit: row.precio_unit || 0,
+                  nombre_factura: row.nombre_factura || textoInput });
+    }
   });
 
   if (!rows.length) { mostrarError('No hay ítems válidos para registrar.'); btn.disabled=false; btn.textContent='✅ Registrar entradas'; return; }
