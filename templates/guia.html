@@ -80,11 +80,15 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF3F0;min-height:100vh
 .btn-mail{background:#5E7B6E;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
 .btn-mail:hover{background:#3d5a50}
 /* Modal edición */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center;padding:16px}
 .modal-overlay.open{display:flex}
-.modal-box{background:#fff;border-radius:12px;padding:24px;width:min(460px,94vw);box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+.modal-box{background:#fff;border-radius:12px;padding:24px;width:min(560px,96vw);max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
 .modal-title{font-size:15px;font-weight:700;color:#0D4F3C;margin-bottom:16px}
 .modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+.modal-section{font-size:11px;font-weight:700;color:#5E7B6E;text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;padding-top:14px;border-top:1px solid #EEF3F0}
+.edit-item-row{display:grid;grid-template-columns:1fr 80px 34px;gap:8px;margin-bottom:8px;align-items:center}
+.edit-item-row input,.edit-item-row select{padding:7px 10px;border:1px solid #D4E4DC;border-radius:7px;font-size:13px;width:100%;color:#1C2E26}
+.edit-item-row input:focus{outline:none;border-color:#0D4F3C}
 </style>
 </head>
 <body>
@@ -193,20 +197,33 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF3F0;min-height:100vh
   <div class="modal-box">
     <div class="modal-title">✏️ Editar Guía de Salida</div>
     <input type="hidden" id="edit-id">
-    <div class="form-group" style="margin-bottom:12px">
-      <label>Responsable del retiro</label>
-      <input type="text" id="edit-responsable">
+
+    <div class="form-row" style="margin-bottom:12px">
+      <div class="form-group">
+        <label>Responsable del retiro</label>
+        <input type="text" id="edit-responsable">
+      </div>
+      <div class="form-group">
+        <label>Edificio de destino</label>
+        <select id="edit-edificio">
+          {% for e in edificios %}<option>{{ e }}</option>{% endfor %}
+        </select>
+      </div>
     </div>
-    <div class="form-group" style="margin-bottom:12px">
-      <label>Edificio de destino</label>
-      <select id="edit-edificio">
-        {% for e in edificios %}<option>{{ e }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="form-group">
+    <div class="form-group" style="margin-bottom:4px">
       <label>Observaciones</label>
       <input type="text" id="edit-obs" placeholder="Opcional...">
     </div>
+
+    <div class="modal-section">Productos</div>
+    <div style="display:grid;grid-template-columns:1fr 80px 34px;gap:8px;padding:0 0 6px;border-bottom:1px solid #EEF3F0;margin-bottom:8px">
+      <span style="font-size:11px;font-weight:700;color:#5E7B6E;text-transform:uppercase">Producto</span>
+      <span style="font-size:11px;font-weight:700;color:#5E7B6E;text-transform:uppercase">Cant.</span>
+      <span></span>
+    </div>
+    <div id="edit-items-list"></div>
+    <button class="btn-add" onclick="agregarEditItem()" style="margin-top:4px">+ Agregar producto</button>
+
     <div class="modal-actions">
       <button class="btn-out" onclick="cerrarModal()">Cancelar</button>
       <button class="btn-green" onclick="guardarEdicion()">💾 Guardar</button>
@@ -562,7 +579,7 @@ async function renderGuias(){
         </div>
         <div class="guia-actions">
           <button class="btn-ver-pdf" onclick="verPDF(${g.id},event)">📄 Ver PDF</button>
-          <button class="btn-edit-guia" onclick="abrirEdicion(${g.id},'${esc(g.responsable)}','${esc(g.edificio)}','${esc(g.observacion||'')}',event)">✏️ Editar</button>
+          <button class="btn-edit-guia" data-gid="${g.id}" data-resp="${esc(g.responsable)}" data-edif="${esc(g.edificio)}" data-obs="${esc(g.observacion||'')}" data-items='${JSON.stringify(g.items||[]).replace(/'/g,"&#39;")}' onclick="abrirEdicionBtn(this,event)">✏️ Editar</button>
           ${ROL_USUARIO==='admin'?`<button class="btn-del-guia" onclick="eliminarGuia(${g.id},event)">🗑️</button>`:''}
         </div>
       </div>
@@ -599,23 +616,51 @@ async function verPDF(id, e){
   }
 }
 
-function abrirEdicion(id, responsable, edificio, obs, e){
+function abrirEdicionBtn(btn, e){
   if(e){ e.stopPropagation(); }
+  const items = JSON.parse(btn.dataset.items || '[]');
+  abrirEdicion(btn.dataset.gid, btn.dataset.resp, btn.dataset.edif, btn.dataset.obs, items);
+}
+
+function abrirEdicion(id, responsable, edificio, obs, items){
   document.getElementById('edit-id').value = id;
   document.getElementById('edit-responsable').value = responsable;
   document.getElementById('edit-obs').value = obs;
-  // Seleccionar edificio
   const sel = document.getElementById('edit-edificio');
   for(let i=0;i<sel.options.length;i++){
     if(sel.options[i].value === edificio || sel.options[i].text === edificio){
       sel.selectedIndex = i; break;
     }
   }
+  // Poblar items
+  const lista = document.getElementById('edit-items-list');
+  lista.innerHTML = '';
+  (items||[]).forEach(it => agregarEditItemConValor(it.nombre||it.producto||'', it.cantidad||1));
+  if(!items||!items.length) agregarEditItem();
   document.getElementById('modal-edit').classList.add('open');
 }
 
 function cerrarModal(){
   document.getElementById('modal-edit').classList.remove('open');
+}
+
+function agregarEditItem(){ agregarEditItemConValor('', 1); }
+
+function agregarEditItemConValor(nombre, cantidad){
+  const lista = document.getElementById('edit-items-list');
+  const row = document.createElement('div');
+  row.className = 'edit-item-row';
+  // Input producto con datalist
+  const prodOpts = PRODUCTOS_BD.map(p=>`<option value="${p.nombre}">`).join('');
+  row.innerHTML = `
+    <div style="position:relative">
+      <input type="text" list="edit-prod-list" placeholder="Buscar producto..." value="${(nombre||'').replace(/"/g,'&quot;')}">
+      <datalist id="edit-prod-list">${prodOpts}</datalist>
+    </div>
+    <input type="number" min="1" value="${cantidad||1}" style="text-align:center">
+    <button class="btn-rm" onclick="this.closest('.edit-item-row').remove()">×</button>
+  `;
+  lista.appendChild(row);
 }
 
 async function guardarEdicion(){
@@ -624,11 +669,21 @@ async function guardarEdicion(){
   const edificio    = document.getElementById('edit-edificio').value;
   const obs         = document.getElementById('edit-obs').value.trim();
   if(!responsable){ alert('Ingresa el responsable'); return; }
+  // Recoger items del modal
+  const filas = document.querySelectorAll('#edit-items-list .edit-item-row');
+  const items = [];
+  for(const fila of filas){
+    const inputs = fila.querySelectorAll('input');
+    const nombre = inputs[0].value.trim();
+    const cant   = parseInt(inputs[1].value)||0;
+    if(nombre && cant>0) items.push({nombre, cantidad: cant});
+  }
+  if(!items.length){ alert('Agrega al menos un producto'); return; }
   try {
     const r = await fetch(`/api/guias_salida/${id}`,{
       method:'PUT',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({responsable, edificio, observacion: obs})
+      body: JSON.stringify({responsable, edificio, observacion: obs, items})
     });
     const d = await r.json();
     if(!d.ok){ alert('Error al guardar'); return; }
