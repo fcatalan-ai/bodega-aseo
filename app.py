@@ -1446,9 +1446,30 @@ def procesar_factura():
     cur2 = conn2.cursor()
     try:
         for row in rows:
-            pid  = row.get('producto_id')
-            cant = int(row.get('cantidad', 0))
-            if not pid or cant <= 0:
+            pid      = row.get('producto_id')
+            cant     = int(row.get('cantidad', 0))
+            nombre_n = (row.get('nombre_nuevo') or '').strip()
+            if cant <= 0:
+                continue
+            # Crear producto nuevo si viene nombre_nuevo sin producto_id
+            if not pid and nombre_n:
+                try:
+                    if mode2 == 'pg':
+                        cur2.execute(
+                            "INSERT INTO productos (nombre,categoria,unidad,stock_actual,stock_minimo) VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                            (nombre_n, 'Varios', 'unidades', 0, 0))
+                        pid = cur2.fetchone()[0]
+                    else:
+                        cur2.execute(
+                            "INSERT INTO productos (nombre,categoria,unidad,stock_actual,stock_minimo) VALUES (?,?,?,?,?)",
+                            (nombre_n, 'Varios', 'unidades', 0, 0))
+                        pid = cur2.lastrowid
+                    # Guardar pid de vuelta en el row para guias_entrada
+                    row['producto_id'] = pid
+                except Exception as e_crea:
+                    errores.append(f"No se pudo crear '{nombre_n}': {e_crea}")
+                    continue
+            if not pid:
                 continue
             try:
                 if mode2 == 'pg':
@@ -1480,8 +1501,8 @@ def procesar_factura():
             cant = int(row.get('cantidad', 0))
             if not pid or cant <= 0:
                 continue
-            nombre_prod = row.get('nombre_factura', row.get('nombre', '')) or ''
-            # Si no viene nombre desde el PDF, buscar en la tabla productos
+            nombre_prod = (row.get('nombre_nuevo') or row.get('nombre_factura') or row.get('nombre') or '').strip()
+            # Si no viene nombre, buscar en la tabla productos
             if not nombre_prod and pid:
                 p = db_fetchone("SELECT nombre FROM productos WHERE id=?", (int(pid),))
                 if p:
