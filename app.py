@@ -1781,42 +1781,133 @@ def get_guias_salida():
 def regenerar_pdf_guia_salida(gid):
     """Regenera el PDF de una guía de salida existente."""
     import json as _json
-    row = db_fetchone("SELECT * FROM guias_salida WHERE id=?", (gid,))
+    conn, mode = get_db()
+    cur = conn.cursor()
+    try:
+        if mode == 'pg':
+            cur.execute("SELECT guia_id,fecha,responsable,edificio,observacion,items_json FROM guias_salida WHERE id=%s", (gid,))
+        else:
+            cur.execute("SELECT guia_id,fecha,responsable,edificio,observacion,items_json FROM guias_salida WHERE id=?", (gid,))
+        row = cur.fetchone()
+    finally:
+        conn.close()
+
     if not row:
         return jsonify({'error': 'No encontrada'}), 404
 
-    row = dict(row) if hasattr(row, 'keys') else {
-        'guia_id': row[2], 'fecha': row[3], 'responsable': row[4],
-        'edificio': row[5], 'observacion': row[6], 'items_json': row[8]
-    }
-    items = []
-    try:
-        items = _json.loads(row.get('items_json') or '[]')
-    except Exception:
-        pass
+    guia_id     = row[0]
+    fecha       = row[1]
+    responsable = row[2]
+    edificio    = row[3]
+    observacion = row[4]
+    items_json  = row[5]
 
-    # Reutilizar el endpoint de generación de PDF
-    from flask import current_app
-    with current_app.test_request_context(
-        '/api/guias/pdf', method='POST',
-        json={
-            'guia_id':    row.get('guia_id', ''),
-            'fecha':      row.get('fecha', ''),
-            'responsable':row.get('responsable', ''),
-            'edificio':   row.get('edificio', ''),
-            'obs':        row.get('observacion', ''),
-            'items':      items,
-            'firma':      '',
-        },
-        headers={'Content-Type': 'application/json'}
-    ):
-        resp = generar_pdf_guia()
-    if hasattr(resp, 'get_json'):
-        data = resp.get_json()
-    else:
-        import json as _json2
-        data = _json2.loads(resp.data)
-    return jsonify(data)
+    try:
+        items = _json.loads(items_json or '[]')
+    except Exception:
+        items = []
+
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        return jsonify({'error': 'fpdf2 no instalado'}), 500
+
+    def safe(txt):
+        repl = {'á':'a','é':'e','í':'i','ó':'o','ú':'u',
+                'Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U',
+                'ñ':'n','Ñ':'N','ü':'u','Ü':'U',
+                '—':'-','–':'-','"':'"','"':'"','¿':'?','¡':'!'}
+        out = ''
+        for ch in str(txt):
+            out += repl.get(ch, ch if ord(ch) < 256 else '?')
+        return out
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_margins(15, 15, 15)
+
+    pdf.set_fill_color(13, 79, 60)
+    pdf.rect(0, 0, 210, 28, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Helvetica', 'B', 16)
+    pdf.set_xy(15, 6)
+    pdf.cell(0, 8, safe('Colegio Centenario de Temuco'), ln=True)
+    pdf.set_font('Helvetica', '', 10)
+    pdf.set_xy(15, 15)
+    pdf.cell(0, 7, safe('Bodega de Aseo - Guia de Salida'), ln=True)
+    pdf.set_font('Helvetica', 'B', 11)
+    pdf.set_xy(140, 8)
+    pdf.cell(55, 8, safe(guia_id), align='R')
+    pdf.set_text_color(0, 0, 0)
+
+    pdf.set_xy(15, 33)
+    pdf.set_fill_color(240, 247, 244)
+    pdf.rect(15, 33, 180, 26, 'F')
+    pdf.set_font('Helvetica', 'B', 9)
+    pdf.set_xy(18, 36)
+    pdf.cell(45, 6, safe('Responsable del retiro:'))
+    pdf.set_font('Helvetica', '', 9)
+    pdf.cell(0, 6, safe(responsable), ln=True)
+    pdf.set_font('Helvetica', 'B', 9)
+    pdf.set_x(18)
+    pdf.cell(45, 6, safe('Edificio de destino:'))
+    pdf.set_font('Helvetica', '', 9)
+    pdf.cell(60, 6, safe(edificio))
+    pdf.set_font('Helvetica', 'B', 9)
+    pdf.cell(20, 6, 'Fecha:')
+    pdf.set_font('Helvetica', '', 9)
+    pdf.cell(0, 6, safe(fecha), ln=True)
+    if observacion:
+        pdf.set_font('Helvetica', 'B', 9)
+        pdf.set_x(18)
+        pdf.cell(45, 6, 'Observaciones:')
+        pdf.set_font('Helvetica', '', 9)
+        pdf.cell(0, 6, safe(observacion), ln=True)
+
+    pdf.set_xy(15, 64)
+    pdf.set_fill_color(26, 107, 82)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Helvetica', 'B', 9)
+    pdf.cell(10, 7, '#', fill=True, border=0, align='C')
+    pdf.cell(105, 7, 'Producto', fill=True, border=0)
+    pdf.cell(30, 7, 'Cantidad', fill=True, border=0, align='C')
+    pdf.cell(35, 7, 'Unidad', fill=True, border=0, align='C')
+    pdf.ln()
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Helvetica', '', 9)
+    for i, it in enumerate(items, 1):
+        pdf.set_fill_color(245, 250, 248) if i % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+        pdf.cell(10, 7, str(i), fill=True, border=0, align='C')
+        pdf.cell(105, 7, safe(it.get('nombre', '')), fill=True, border=0)
+        pdf.cell(30, 7, str(it.get('cantidad', '')), fill=True, border=0, align='C')
+        pdf.cell(35, 7, safe(it.get('unidad', '')), fill=True, border=0, align='C')
+        pdf.ln()
+    pdf.set_fill_color(224, 235, 224)
+    pdf.set_font('Helvetica', 'B', 9)
+    total_cant = sum(int(it.get('cantidad', 0)) for it in items)
+    pdf.cell(10, 7, '', fill=True, border=0)
+    pdf.cell(105, 7, safe(f'Total: {len(items)} producto(s)'), fill=True, border=0)
+    pdf.cell(30, 7, str(total_cant), fill=True, border=0, align='C')
+    pdf.cell(35, 7, 'unidades', fill=True, border=0, align='C')
+    pdf.ln(14)
+
+    pdf.set_font('Helvetica', '', 9)
+    pdf.cell(0, 6, '_' * 45 + '   ' + '_' * 30, ln=True)
+    pdf.set_font('Helvetica', '', 8)
+    pdf.cell(0, 5, safe('     Firma del responsable                    RUT'), ln=True)
+
+    pdf.ln(4)
+    pdf.set_font('Helvetica', '', 7)
+    pdf.set_text_color(150, 150, 150)
+    pdf.set_x(15)
+    pdf.cell(0, 5, safe(f'Generado el {datetime.now().strftime("%d-%m-%Y %H:%M")} - Sistema Bodega Aseo - Colegio Centenario de Temuco'), align='C')
+
+    buf = io.BytesIO()
+    pdf.output(buf)
+    buf.seek(0)
+    pdf_b64 = base64.b64encode(buf.read()).decode('utf-8')
+    return jsonify({'ok': True, 'pdf_b64': pdf_b64, 'nombre': f'{guia_id}.pdf'})
 
 
 @app.route('/api/guias_salida/<int:gid>', methods=['PUT'])
