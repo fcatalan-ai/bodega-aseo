@@ -609,6 +609,9 @@ function renderGuiaCard(g) {
   const btnElim = puedeEliminar
     ? `<button class="btn-sm btn-danger" onclick="eliminarGuia(${g.id}, event)">🗑 Eliminar</button>`
     : `<span style="font-size:.72rem;color:#555">Factura: eliminar desde /facturas</span>`;
+  const btnPdf = g.cloudinary_url
+    ? `<a href="${g.cloudinary_url}" target="_blank" class="btn-sm" style="background:#1e2a4a;color:#90caf9;border:1px solid #2a3a6a;text-decoration:none;padding:5px 10px;border-radius:6px;font-size:.75rem;font-weight:600">📄 Ver PDF</a>`
+    : '';
 
   return `
     <div class="hist-card" id="hcard-${g.id}">
@@ -624,7 +627,7 @@ function renderGuiaCard(g) {
         ${itemsHtml}
         <div class="hist-foot">
           <span class="obs">${g.observacion ? '📝 ' + g.observacion : ''} ${g.usuario ? '· 👤 '+g.usuario : ''}</span>
-          <div class="hactions">${btnElim}</div>
+          <div class="hactions">${btnPdf}${btnElim}</div>
         </div>
       </div>
     </div>`;
