@@ -55,6 +55,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .result-box .res-num{font-size:32px;font-weight:800;color:#0D4F3C}
 .result-box .res-txt{font-size:13px;color:#555;margin-top:4px}
 .footer{text-align:center;padding:16px;font-size:11px;color:#bbb}
+/* Canvas firma */
+.firma-label{font-size:12px;color:#555;font-weight:600;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.canvas-firma{display:block;width:100%;border:1.5px solid #0D4F3C;border-radius:9px;background:#fff;touch-action:none;cursor:crosshair}
+.btn-clear-firma{background:#fff;border:1px solid #ddd;color:#888;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer}
+.firma-hint{font-size:11px;color:#bbb;margin-top:4px;text-align:center}
+.btn-ver-pdf{display:inline-block;margin-top:10px;background:#0D4F3C;color:#fff;border:none;padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+.btn-ver-pdf:hover{background:#1a6b52}
 </style>
 </head>
 <body>
@@ -117,14 +124,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
       <input type="password" id="f-pin" placeholder="••••" maxlength="8" inputmode="numeric">
     </div>
 
+    <!-- Firma -->
+    <div class="form-group" style="margin-top:4px">
+      <div class="firma-label">
+        <span>Firma del responsable *</span>
+        <button class="btn-clear-firma" onclick="limpiarFirma()">✕ Limpiar</button>
+      </div>
+      <canvas id="canvas-firma" class="canvas-firma" height="130"></canvas>
+      <div class="firma-hint">Firme con el dedo o el mouse</div>
+    </div>
+
     <button class="btn-salida" onclick="registrarSalida()" id="btn-salida">
-      📤 Registrar retiro
+      📄 Registrar retiro + Guía
     </button>
 
     <div class="result-box" id="result-box">
       <div>✅ Retiro registrado</div>
       <div class="res-num" id="res-stock">—</div>
-      <div class="res-txt" id="res-txt">unidades quedan en bodega</div>
+      <div class="res-txt">{{ producto.unidad }} quedan en bodega</div>
+      <div id="res-guia" style="font-size:12px;color:#0D4F3C;margin-top:6px;font-weight:600"></div>
+      <button class="btn-ver-pdf" id="btn-ver-pdf" style="display:none" onclick="verPDFGuia()">📄 Ver Guía PDF</button>
     </div>
   </div>
   {% else %}
@@ -168,6 +187,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 
 <script>
 const PID = {{ producto.id }};
+let _pdfB64 = null;
 
 function toast(msg, tipo='', ms=3000){
   const t = document.getElementById('toast');
@@ -177,68 +197,130 @@ function toast(msg, tipo='', ms=3000){
   t._to = setTimeout(()=>{ t.classList.remove('show'); }, ms);
 }
 
+/* ─── Canvas firma ─── */
+(function(){
+  const canvas = document.getElementById('canvas-firma');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let drawing = false;
+  function resize(){
+    const old = canvas.toDataURL();
+    canvas.width = canvas.offsetWidth;
+    const img = new Image();
+    img.onload = ()=> ctx.drawImage(img, 0, 0);
+    img.src = old;
+  }
+  window.addEventListener('resize', resize);
+  setTimeout(resize, 50);
+  function pos(e){
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return {x:(t.clientX-r.left)*(canvas.width/r.width), y:(t.clientY-r.top)*(canvas.height/r.height)};
+  }
+  function startDraw(e){ e.preventDefault(); drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }
+  function draw(e){ e.preventDefault(); if(!drawing) return; const p=pos(e); ctx.lineWidth=2; ctx.lineCap='round'; ctx.strokeStyle='#0D4F3C'; ctx.lineTo(p.x,p.y); ctx.stroke(); }
+  function endDraw(){ drawing=false; }
+  canvas.addEventListener('mousedown', startDraw);
+  canvas.addEventListener('mousemove', draw);
+  canvas.addEventListener('mouseup', endDraw);
+  canvas.addEventListener('mouseleave', endDraw);
+  canvas.addEventListener('touchstart', startDraw, {passive:false});
+  canvas.addEventListener('touchmove', draw, {passive:false});
+  canvas.addEventListener('touchend', endDraw);
+})();
+
+function limpiarFirma(){
+  const c = document.getElementById('canvas-firma');
+  if(c) c.getContext('2d').clearRect(0, 0, c.width, c.height);
+}
+
+function firmaVacia(){
+  const c = document.getElementById('canvas-firma');
+  if(!c) return true;
+  const d = c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+  for(let i=3; i<d.length; i+=4) if(d[i]>10) return false;
+  return true;
+}
+
+function abrirPDF(b64, nombre){
+  try {
+    const bytes = atob(b64);
+    const arr = new Uint8Array(bytes.length);
+    for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+    const blob = new Blob([arr], {type:'application/pdf'});
+    const url  = URL.createObjectURL(blob);
+    const w = window.open(url, '_blank');
+    if(!w){ const a=document.createElement('a'); a.href=url; a.download=nombre; a.click(); }
+    setTimeout(()=> URL.revokeObjectURL(url), 30000);
+  } catch(e){ console.warn('PDF open error', e); }
+}
+
+function verPDFGuia(){
+  if(_pdfB64) abrirPDF(_pdfB64, 'guia_retiro.pdf');
+}
+
 async function registrarSalida(){
   const nombre   = document.getElementById('f-nombre').value.trim();
   const edificio = document.getElementById('f-edificio').value.trim();
   const cantidad = parseInt(document.getElementById('f-cantidad').value) || 0;
   const pin      = document.getElementById('f-pin').value.trim();
 
-  if(!nombre)   { toast('Ingresa tu nombre', 'error'); return; }
-  if(!edificio) { toast('Selecciona el edificio', 'error'); return; }
+  if(!nombre)       { toast('Ingresa tu nombre', 'error'); return; }
+  if(!edificio)     { toast('Selecciona el edificio', 'error'); return; }
   if(cantidad <= 0) { toast('Ingresa una cantidad válida', 'error'); return; }
-  if(!pin)      { toast('Ingresa el PIN de bodega', 'error'); return; }
+  if(!pin)          { toast('Ingresa el PIN de bodega', 'error'); return; }
+  if(firmaVacia())  { toast('Por favor firma el documento', 'error'); return; }
+
+  const firma_b64 = document.getElementById('canvas-firma').toDataURL('image/png');
 
   const btn = document.getElementById('btn-salida');
   btn.disabled = true;
-  btn.textContent = 'Registrando...';
+  btn.textContent = '⏳ Generando guía...';
 
   try {
     const r = await fetch(`/api/productos/${PID}/salida-publica`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({nombre, edificio, cantidad, pin})
+      body: JSON.stringify({nombre, edificio, cantidad, pin, firma_b64})
     });
     const d = await r.json();
 
     if(d.error){
       toast('❌ ' + d.error, 'error', 4000);
       btn.disabled = false;
-      btn.textContent = '📤 Registrar retiro';
+      btn.textContent = '📄 Registrar retiro + Guía';
       return;
     }
 
-    // Éxito
+    _pdfB64 = d.pdf_b64 || null;
+    if(_pdfB64) abrirPDF(_pdfB64, (d.guia_id||'guia') + '.pdf');
+
     document.getElementById('stock-num').textContent = d.stock_nuevo;
     document.getElementById('res-stock').textContent = d.stock_nuevo;
-    document.getElementById('res-txt').textContent = `{{ producto.unidad }} quedan en bodega`;
+    if(d.guia_id) document.getElementById('res-guia').textContent = '📄 Guía ' + d.guia_id;
+    if(_pdfB64)   document.getElementById('btn-ver-pdf').style.display = 'inline-block';
     document.getElementById('result-box').classList.add('show');
 
-    // Limpiar formulario
     document.getElementById('f-nombre').value = '';
     document.getElementById('f-cantidad').value = '';
     document.getElementById('f-pin').value = '';
     document.getElementById('f-edificio').value = '';
+    limpiarFirma();
 
-    // Actualizar badge de estado
-    const stockNum = document.getElementById('stock-num');
-    stockNum.className = 'stock-num' + (d.stock_nuevo === 0 ? ' zero' : '');
+    document.getElementById('stock-num').className = 'stock-num' + (d.stock_nuevo === 0 ? ' zero' : '');
+    toast('✅ Guía registrada correctamente', 'success');
+    btn.textContent = '📄 Registrar retiro + Guía';
+    btn.disabled = d.stock_nuevo <= 0;
 
-    toast('✅ Retiro registrado correctamente', 'success');
-    btn.textContent = '📤 Registrar retiro';
-    if(d.stock_nuevo <= 0) btn.disabled = true;
-    else btn.disabled = false;
-
-    // Scroll al resultado
     document.getElementById('result-box').scrollIntoView({behavior:'smooth', block:'center'});
 
   } catch(e){
     toast('Error de conexión. Intenta nuevamente.', 'error');
     btn.disabled = false;
-    btn.textContent = '📤 Registrar retiro';
+    btn.textContent = '📄 Registrar retiro + Guía';
   }
 }
 
-// Enter en PIN lanza registro
 document.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('f-pin').addEventListener('keydown', e=>{
     if(e.key === 'Enter') registrarSalida();
