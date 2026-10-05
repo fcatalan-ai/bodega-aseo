@@ -476,13 +476,16 @@ def producto_publico(pid):
 
 @app.route('/api/productos/<int:pid>/salida-publica', methods=['POST'])
 def salida_publica(pid):
-    """Registra salida rapida desde la pagina publica (sin login, con PIN)."""
+    """Registra salida rapida desde la pagina publica (sin login, con PIN).
+    Genera guia de salida con PDF y lo sube a Cloudinary."""
+    import json as _json
     PIN_BODEGA = os.environ.get('PIN_BODEGA', '')
     d = request.json
-    pin      = str(d.get('pin', '')).strip()
-    nombre   = str(d.get('nombre', '')).strip()
-    edificio = str(d.get('edificio', '')).strip()
-    cant     = int(d.get('cantidad', 0))
+    pin       = str(d.get('pin', '')).strip()
+    nombre    = str(d.get('nombre', '')).strip()
+    edificio  = str(d.get('edificio', '')).strip()
+    cant      = int(d.get('cantidad', 0))
+    firma_b64 = d.get('firma_b64', '')
 
     if not PIN_BODEGA:
         return jsonify({'error': 'PIN_BODEGA no configurado en el servidor'}), 500
@@ -501,23 +504,187 @@ def salida_publica(pid):
     if p['stock_actual'] < cant:
         return jsonify({'error': f'Stock insuficiente. Disponible: {p["stock_actual"]} {p["unidad"]}'}), 400
 
-    fecha = datetime.now().strftime('%d-%m-%Y')
+    fecha    = datetime.now().strftime('%d-%m-%Y')
+    guia_id  = 'G-' + datetime.now().strftime('%d%m%Y%H%M%S')
+    unidad   = p['unidad'] if isinstance(p, dict) else p[6] if len(p) > 6 else 'un'
+    nombre_prod = p['nombre'] if isinstance(p, dict) else p[1]
+    items    = [{'nombre': nombre_prod, 'cantidad': cant, 'unidad': unidad}]
+    items_json = _json.dumps(items, ensure_ascii=False)
+
+    # Registrar movimiento y descontar stock
     conn, mode = get_db()
     cur = conn.cursor()
-    if mode == 'pg':
-        cur.execute(
-            "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-            (pid, 'salida', cant, edificio, nombre, '[Salida QR]', fecha))
-        cur.execute("UPDATE productos SET stock_actual=stock_actual-%s WHERE id=%s", (cant, pid))
-    else:
-        cur.execute(
-            "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (?,?,?,?,?,?,?)",
-            (pid, 'salida', cant, edificio, nombre, '[Salida QR]', fecha))
-        cur.execute("UPDATE productos SET stock_actual=stock_actual-? WHERE id=?", (cant, pid))
-    conn.commit(); conn.close()
+    try:
+        if mode == 'pg':
+            cur.execute(
+                "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                (pid, 'salida', cant, edificio, nombre, '[Salida QR]', fecha))
+            cur.execute("UPDATE productos SET stock_actual=stock_actual-%s WHERE id=%s", (cant, pid))
+        else:
+            cur.execute(
+                "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (?,?,?,?,?,?,?)",
+                (pid, 'salida', cant, edificio, nombre, '[Salida QR]', fecha))
+            cur.execute("UPDATE productos SET stock_actual=stock_actual-? WHERE id=?", (cant, pid))
+        conn.commit()
+    finally:
+        conn.close()
 
     nuevo_stock = db_fetchone("SELECT stock_actual FROM productos WHERE id=?", (pid,))
-    return jsonify({'ok': True, 'stock_nuevo': nuevo_stock['stock_actual'] if nuevo_stock else 0})
+    stock_nuevo = (nuevo_stock['stock_actual'] if isinstance(nuevo_stock, dict) else nuevo_stock[0]) if nuevo_stock else 0
+
+    # Generar PDF de guia de salida
+    pdf_b64 = ''
+    try:
+        from fpdf import FPDF
+
+        def _safe(txt):
+            repl = {'á':'a','é':'e','í':'i','ó':'o','ú':'u',
+                    'Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U',
+                    'ñ':'n','Ñ':'N','ü':'u','Ü':'U',
+                    '—':'-','–':'-','"':'"','"':'"','¿':'?','¡':'!'}
+            out = ''
+            for ch in str(txt):
+                out += repl.get(ch, ch if ord(ch) < 256 else '?')
+            return out
+
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.set_margins(15, 15, 15)
+
+        pdf.set_fill_color(13, 79, 60)
+        pdf.rect(0, 0, 210, 28, 'F')
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font('Helvetica', 'B', 16)
+        pdf.set_xy(15, 6)
+        pdf.cell(0, 8, _safe('Colegio Centenario de Temuco'), ln=True)
+        pdf.set_font('Helvetica', '', 10)
+        pdf.set_xy(15, 15)
+        pdf.cell(0, 7, _safe('Bodega de Aseo - Guia de Salida (QR)'), ln=True)
+        pdf.set_font('Helvetica', 'B', 11)
+        pdf.set_xy(140, 8)
+        pdf.cell(55, 8, _safe(guia_id), align='R')
+        pdf.set_text_color(0, 0, 0)
+
+        pdf.set_xy(15, 33)
+        pdf.set_fill_color(240, 247, 244)
+        pdf.rect(15, 33, 180, 26, 'F')
+        pdf.set_font('Helvetica', 'B', 9)
+        pdf.set_xy(18, 36)
+        pdf.cell(45, 6, _safe('Responsable del retiro:'))
+        pdf.set_font('Helvetica', '', 9)
+        pdf.cell(0, 6, _safe(nombre), ln=True)
+        pdf.set_font('Helvetica', 'B', 9)
+        pdf.set_x(18)
+        pdf.cell(45, 6, _safe('Edificio de destino:'))
+        pdf.set_font('Helvetica', '', 9)
+        pdf.cell(60, 6, _safe(edificio))
+        pdf.set_font('Helvetica', 'B', 9)
+        pdf.cell(20, 6, 'Fecha:')
+        pdf.set_font('Helvetica', '', 9)
+        pdf.cell(0, 6, _safe(fecha), ln=True)
+
+        pdf.set_xy(15, 64)
+        pdf.set_fill_color(26, 107, 82)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font('Helvetica', 'B', 9)
+        pdf.cell(10, 7, '#', fill=True, border=0, align='C')
+        pdf.cell(105, 7, 'Producto', fill=True, border=0)
+        pdf.cell(30, 7, 'Cantidad', fill=True, border=0, align='C')
+        pdf.cell(35, 7, 'Unidad', fill=True, border=0, align='C')
+        pdf.ln()
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font('Helvetica', '', 9)
+        pdf.set_fill_color(255, 255, 255)
+        pdf.cell(10, 7, '1', fill=True, border=0, align='C')
+        pdf.cell(105, 7, _safe(nombre_prod), fill=True, border=0)
+        pdf.cell(30, 7, str(cant), fill=True, border=0, align='C')
+        pdf.cell(35, 7, _safe(unidad), fill=True, border=0, align='C')
+        pdf.ln()
+        pdf.set_fill_color(224, 235, 224)
+        pdf.set_font('Helvetica', 'B', 9)
+        pdf.cell(10, 7, '', fill=True, border=0)
+        pdf.cell(105, 7, 'Total: 1 producto(s)', fill=True, border=0)
+        pdf.cell(30, 7, str(cant), fill=True, border=0, align='C')
+        pdf.cell(35, 7, _safe(unidad), fill=True, border=0, align='C')
+        pdf.ln(10)
+
+        # Firma
+        if firma_b64:
+            try:
+                b64data = firma_b64.split(',', 1)[-1] if ',' in firma_b64 else firma_b64
+                firma_bytes = base64.b64decode(b64data)
+                firma_path = '/tmp/_firma_qr_tmp.png'
+                with open(firma_path, 'wb') as f:
+                    f.write(firma_bytes)
+                pdf.set_font('Helvetica', 'B', 9)
+                pdf.cell(0, 6, _safe('Firma del responsable:'), ln=True)
+                pdf.image(firma_path, x=15, w=70)
+                import os as _os
+                try: _os.remove(firma_path)
+                except: pass
+            except Exception:
+                pdf.set_font('Helvetica', '', 9)
+                pdf.cell(0, 6, '_' * 45 + '   ' + '_' * 30, ln=True)
+                pdf.set_font('Helvetica', '', 8)
+                pdf.cell(0, 5, _safe('     Firma del responsable                    RUT'), ln=True)
+        else:
+            pdf.set_font('Helvetica', '', 9)
+            pdf.cell(0, 6, '_' * 45 + '   ' + '_' * 30, ln=True)
+            pdf.set_font('Helvetica', '', 8)
+            pdf.cell(0, 5, _safe('     Firma del responsable                    RUT'), ln=True)
+
+        pdf.ln(4)
+        pdf.set_font('Helvetica', '', 7)
+        pdf.set_text_color(150, 150, 150)
+        pdf.set_x(15)
+        pdf.cell(0, 5, _safe(f'Generado el {datetime.now().strftime("%d-%m-%Y %H:%M")} - Sistema Bodega Aseo - Colegio Centenario de Temuco'), align='C')
+
+        buf = io.BytesIO()
+        pdf.output(buf)
+        buf.seek(0)
+        pdf_b64 = base64.b64encode(buf.read()).decode('utf-8')
+    except Exception as e:
+        print(f'[PDF QR] {e}')
+
+    # Subir PDF a Cloudinary
+    cloudinary_url = None
+    if pdf_b64 and CLOUDINARY_URL:
+        try:
+            import cloudinary, cloudinary.uploader
+            cloudinary.config(cloudinary_url=CLOUDINARY_URL)
+            pdf_bytes = base64.b64decode(pdf_b64)
+            result = cloudinary.uploader.upload(
+                io.BytesIO(pdf_bytes),
+                resource_type='raw',
+                public_id=f'bodega_aseo/guias_salida/{guia_id}',
+                format='pdf', overwrite=True,
+                use_filename=True, unique_filename=False,
+            )
+            cloudinary_url = result.get('secure_url')
+        except Exception as e:
+            print(f'[Cloudinary QR] {e}')
+
+    # Guardar guia en BD
+    try:
+        conn2, mode2 = get_db()
+        cur2 = conn2.cursor()
+        if mode2 == 'pg':
+            cur2.execute(
+                "INSERT INTO guias_salida (guia_id,fecha,responsable,edificio,observacion,usuario,items_json,cloudinary_url,firma_b64) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (guia_id, fecha, nombre, edificio, '[Salida QR]', nombre, items_json, cloudinary_url, firma_b64))
+        else:
+            cur2.execute(
+                "INSERT INTO guias_salida (guia_id,fecha,responsable,edificio,observacion,usuario,items_json,cloudinary_url,firma_b64) "
+                "VALUES (?,?,?,?,?,?,?,?,?)",
+                (guia_id, fecha, nombre, edificio, '[Salida QR]', nombre, items_json, cloudinary_url, firma_b64))
+        conn2.commit()
+        conn2.close()
+    except Exception as e:
+        print(f'[GuiaDB QR] {e}')
+
+    return jsonify({'ok': True, 'stock_nuevo': stock_nuevo, 'guia_id': guia_id, 'pdf_b64': pdf_b64})
 
 @app.route('/api/productos/<int:pid>/qr')
 def get_qr(pid):
