@@ -616,7 +616,7 @@ function renderGuiaCard(g) {
     </div>` : '<p style="color:#555;font-size:.78rem">Sin detalle de items</p>';
 
   const btnPdf = g.cloudinary_url
-    ? `<a href="${g.cloudinary_url}" target="_blank" class="btn-sm" style="background:#1e2a4a;color:#90caf9;border:1px solid #2a3a6a;text-decoration:none;padding:5px 10px;border-radius:6px;font-size:.75rem;font-weight:600">📄 Ver PDF</a>`
+    ? `<a href="/ver_pdf?url=${encodeURIComponent(g.cloudinary_url)}" target="_blank" class="btn-sm" style="background:#1e2a4a;color:#90caf9;border:1px solid #2a3a6a;text-decoration:none;padding:5px 10px;border-radius:6px;font-size:.75rem;font-weight:600">📄 Ver PDF</a>`
     : '';
 
   return `
