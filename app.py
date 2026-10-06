@@ -2605,12 +2605,12 @@ def eliminar_guia_salida(gid):
 @login_required
 def ver_pdf():
     """
-    Genera una URL firmada de Cloudinary y redirige el navegador a ella.
-    Las URLs firmadas bypass las restricciones ACL de la cuenta.
-    Si no hay CLOUDINARY_URL configurada, redirige directo a la URL original.
+    Descarga el PDF de Cloudinary usando las credenciales API (Basic Auth) y lo sirve.
+    Esto funciona aunque el recurso raw tenga restricciones ACL.
     """
-    import re
-    from flask import redirect as flask_redirect
+    import re, hashlib, time
+    from base64 import b64encode
+
     url = request.args.get('url', '').strip()
     if not url or 'cloudinary.com' not in url:
         return 'URL inválida', 400
@@ -2619,26 +2619,92 @@ def ver_pdf():
         try:
             import cloudinary, cloudinary.utils
             cloudinary.config(cloudinary_url=CLOUDINARY_URL)
-            # Extraer public_id desde la URL de Cloudinary
-            # Formato: https://res.cloudinary.com/<cloud>/raw/upload/v<ver>/<public_id>
-            m = re.search(r'/raw/upload/(?:v\d+/)?(.+)$', url)
-            if m:
-                public_id = m.group(1)  # e.g. bodega_aseo/facturas/F_144_CCT.pdf
-                signed, _ = cloudinary.utils.cloudinary_url(
-                    public_id,
-                    resource_type='raw',
-                    type='upload',
-                    sign_url=True,
-                    secure=True,
-                )
-                if signed:
-                    print(f'[ver_pdf] Redirigiendo a URL firmada: {signed[:80]}...')
-                    return flask_redirect(signed)
-        except Exception as e_sign:
-            print(f'[ver_pdf] Error generando URL firmada: {e_sign}')
+            cfg = cloudinary.config()
 
-    # Fallback: redirigir a la URL original
-    return flask_redirect(url)
+            m = re.search(r'/raw/upload/(?:v\d+/)?(.+)$', url)
+            if m and cfg.api_key and cfg.api_secret and cfg.cloud_name:
+                public_id = m.group(1)
+
+                # Método 1: Admin API download endpoint con firma
+                # POST https://api.cloudinary.com/v1_1/{cloud}/raw/download?public_id=...&signature=...
+                ts = int(time.time())
+                to_sign = f'public_id={public_id}&timestamp={ts}{cfg.api_secret}'
+                sig = hashlib.sha256(to_sign.encode()).hexdigest()
+                dl_url = (
+                    f'https://api.cloudinary.com/v1_1/{cfg.cloud_name}/raw/download'
+                    f'?public_id={public_id}&api_key={cfg.api_key}'
+                    f'&timestamp={ts}&signature={sig}'
+                )
+                print(f'[ver_pdf] intentando admin download: {dl_url[:100]}...')
+                try:
+                    import urllib.request, urllib.error
+                    req = urllib.request.Request(dl_url, headers={'User-Agent': 'python'})
+                    with urllib.request.urlopen(req, timeout=30) as resp:
+                        pdf_bytes = resp.read()
+                    fname = public_id.split('/')[-1] or 'documento.pdf'
+                    return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf',
+                                     as_attachment=False, download_name=fname)
+                except Exception as e1:
+                    print(f'[ver_pdf] admin download falló: {e1}')
+
+                # Método 2: private_download_url del SDK
+                try:
+                    dl_url2 = cloudinary.utils.private_download_url(
+                        public_id, 'pdf', resource_type='raw', type='upload',
+                    )
+                    import urllib.request, urllib.error
+                    req2 = urllib.request.Request(dl_url2, headers={'User-Agent': 'python'})
+                    with urllib.request.urlopen(req2, timeout=30) as resp2:
+                        pdf_bytes = resp2.read()
+                    fname = public_id.split('/')[-1] or 'documento.pdf'
+                    return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf',
+                                     as_attachment=False, download_name=fname)
+                except Exception as e2:
+                    print(f'[ver_pdf] private_download_url falló: {e2}')
+
+                # Método 3: Basic Auth directo sobre la secure_url
+                try:
+                    import urllib.request, urllib.error
+                    token = b64encode(f'{cfg.api_key}:{cfg.api_secret}'.encode()).decode()
+                    req3 = urllib.request.Request(url)
+                    req3.add_header('Authorization', f'Basic {token}')
+                    req3.add_header('User-Agent', 'python')
+                    with urllib.request.urlopen(req3, timeout=30) as resp3:
+                        pdf_bytes = resp3.read()
+                    fname = url.split('/')[-1] or 'documento.pdf'
+                    return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf',
+                                     as_attachment=False, download_name=fname)
+                except Exception as e3:
+                    print(f'[ver_pdf] basic auth falló: {e3}')
+
+                # Ningún método funcionó — redirigir a URL firmada directamente en el browser
+                try:
+                    signed_url, _ = cloudinary.utils.cloudinary_url(
+                        public_id, resource_type='raw', type='upload',
+                        sign_url=True, secure=True, expires_at=int(time.time())+3600,
+                    )
+                    if signed_url:
+                        return redirect(signed_url)
+                except Exception as e4:
+                    print(f'[ver_pdf] signed redirect falló: {e4}')
+
+        except Exception as e_cfg:
+            print(f'[ver_pdf] Error configurando cloudinary: {e_cfg}')
+
+    # Fallback: intentar sin auth
+    try:
+        import urllib.request, urllib.error
+        req = urllib.request.Request(url, headers={'User-Agent': 'python'})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            pdf_bytes = resp.read()
+        fname = url.split('/')[-1] or 'documento.pdf'
+        return send_file(io.BytesIO(pdf_bytes), mimetype='application/pdf',
+                         as_attachment=False, download_name=fname)
+    except Exception as e:
+        return (f'<h3>No se pudo obtener el PDF</h3>'
+                f'<p>Error: {e}</p>'
+                f'<p>URL intentada: {url[:120]}</p>'
+                f'<p><a href="{url}" target="_blank">Intentar abrir directamente ↗</a></p>'), 502
 
 
 @app.route('/debug_cloudinary')
