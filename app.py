@@ -27,6 +27,8 @@ def cloudinary_upload_pdf(pdf_bytes, filename):
             overwrite=True,
             use_filename=True,
             unique_filename=False,
+            access_mode='public',
+            type='upload',
         )
         return result.get('secure_url')
     except Exception as e:
