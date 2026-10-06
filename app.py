@@ -2604,19 +2604,49 @@ def eliminar_guia_salida(gid):
 @app.route('/ver_pdf')
 @login_required
 def ver_pdf():
-    """Proxy para servir PDFs de Cloudinary evitando restricciones ACL del navegador."""
-    import urllib.request, urllib.error
+    """
+    Proxy para servir PDFs de Cloudinary.
+    Cloudinary restringe raw/upload incluso server-side a menos que se use URL firmada.
+    Generamos una URL firmada con las credenciales de la cuenta y hacemos fetch desde ahí.
+    """
+    import re, urllib.request, urllib.error
     url = request.args.get('url', '').strip()
     if not url or 'cloudinary.com' not in url:
         return 'URL inválida', 400
+
+    fetch_url = url  # fallback: intentar con la URL original
+
+    if CLOUDINARY_URL:
+        try:
+            import cloudinary, cloudinary.utils
+            cloudinary.config(cloudinary_url=CLOUDINARY_URL)
+            # Extraer public_id desde la URL:
+            # https://res.cloudinary.com/<cloud>/raw/upload/v<ver>/<public_id>
+            m = re.search(r'/raw/upload/(?:v\d+/)?(.+)$', url)
+            if m:
+                public_id = m.group(1)  # e.g. bodega_aseo/facturas/F_144_CCT.pdf
+                signed, _ = cloudinary.utils.cloudinary_url(
+                    public_id,
+                    resource_type='raw',
+                    type='upload',
+                    sign_url=True,
+                )
+                if signed:
+                    fetch_url = signed
+        except Exception as e_sign:
+            print(f'[ver_pdf] No se pudo generar URL firmada: {e_sign}')
+
     try:
-        with urllib.request.urlopen(url, timeout=15) as resp:
+        req = urllib.request.Request(fetch_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=20) as resp:
             pdf_bytes = resp.read()
+        # Extraer nombre de archivo para la descarga
+        fname = url.split('/')[-1] or 'documento.pdf'
         return send_file(
             io.BytesIO(pdf_bytes),
             mimetype='application/pdf',
             as_attachment=False,
-            download_name='documento.pdf'
+            download_name=fname
         )
     except Exception as e:
         return f'No se pudo obtener el PDF: {e}', 502
