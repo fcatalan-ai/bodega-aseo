@@ -691,11 +691,18 @@ async function confirmar() {
     const textoInput = (document.getElementById(`ac-input-${i}`)?.value || '').trim();
     if (cant <= 0) return;
     if (pid) {
-      rows.push({ producto_id: parseInt(pid), cantidad: cant });
+      rows.push({
+        producto_id: parseInt(pid),
+        cantidad: cant,
+        precio_unit: row.precio_unit || 0,
+        valor: row.valor || (cant * (row.precio_unit || 0)),
+        nombre_factura: row.nombre_factura || ''
+      });
     } else if (textoInput) {
       // nombre libre: crear producto nuevo con el texto del input
       rows.push({ nombre_nuevo: textoInput, cantidad: cant,
                   precio_unit: row.precio_unit || 0,
+                  valor: row.valor || (cant * (row.precio_unit || 0)),
                   nombre_factura: row.nombre_factura || textoInput });
     }
   });
