@@ -106,6 +106,7 @@ tr:hover td{background:#F0F7F3}
     {% if rol == 'admin' %}<a href="/facturas">🧾 Facturas</a>{% endif %}
     <a href="/guia">📄 Guía Salida</a>
     {% if rol in ('admin','operador') %}<a href="/guia_entrada">📥 Guía Entrada</a>{% endif %}
+    {% if rol in ('admin','operador') %}<a href="/guia_despacho">🚚 Guía Despacho</a>{% endif %}
   </div>
   <div class="topbar-right">
     <span class="user-pill">👤 {{ user }}</span>
