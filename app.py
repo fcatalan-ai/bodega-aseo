@@ -994,6 +994,87 @@ def reset_stock_cero():
     db_run("UPDATE productos SET stock_actual=0 WHERE activo=TRUE")
     return jsonify({'ok': True, 'mensaje': 'Stock reseteado a 0 para todos los productos.'})
 
+@app.route('/api/admin/cuadrar_stock', methods=['POST'])
+@admin_required
+def cuadrar_stock():
+    """
+    Recalcula stock desde cero basándose en guias_entrada y guias_salida.
+    1) Pone todo en 0
+    2) Suma cantidades de guias_entrada (items_json)
+    3) Resta cantidades de guias_salida (items_json)
+    Retorna resumen con productos afectados y nuevos stocks.
+    """
+    import json as _json
+    conn, mode = get_db()
+    cur = conn.cursor()
+    try:
+        # 1) Reset a 0
+        if mode == 'pg':
+            cur.execute("UPDATE productos SET stock_actual=0")
+        else:
+            cur.execute("UPDATE productos SET stock_actual=0")
+
+        # 2) Sumar entradas
+        if mode == 'pg':
+            cur.execute("SELECT items_json FROM guias_entrada WHERE items_json IS NOT NULL AND items_json != ''")
+        else:
+            cur.execute("SELECT items_json FROM guias_entrada WHERE items_json IS NOT NULL AND items_json != ''")
+        for row in cur.fetchall():
+            raw = row[0] if isinstance(row, tuple) else row.get('items_json','')
+            try:
+                items = _json.loads(raw) if raw else []
+            except Exception:
+                continue
+            for it in items:
+                pid  = it.get('producto_id')
+                cant = int(it.get('cantidad', 0))
+                if not pid or cant <= 0:
+                    continue
+                if mode == 'pg':
+                    cur.execute("UPDATE productos SET stock_actual=stock_actual+%s WHERE id=%s", (cant, pid))
+                else:
+                    cur.execute("UPDATE productos SET stock_actual=stock_actual+? WHERE id=?", (cant, pid))
+
+        # 3) Restar salidas
+        if mode == 'pg':
+            cur.execute("SELECT items_json FROM guias_salida WHERE items_json IS NOT NULL AND items_json != ''")
+        else:
+            cur.execute("SELECT items_json FROM guias_salida WHERE items_json IS NOT NULL AND items_json != ''")
+        for row in cur.fetchall():
+            raw = row[0] if isinstance(row, tuple) else row.get('items_json','')
+            try:
+                items = _json.loads(raw) if raw else []
+            except Exception:
+                continue
+            for it in items:
+                pid  = it.get('producto_id')
+                cant = int(it.get('cantidad', 0))
+                if not pid or cant <= 0:
+                    continue
+                if mode == 'pg':
+                    cur.execute("UPDATE productos SET stock_actual=stock_actual-%s WHERE id=%s", (cant, pid))
+                else:
+                    cur.execute("UPDATE productos SET stock_actual=stock_actual-? WHERE id=?", (cant, pid))
+
+        conn.commit()
+
+        # Retornar resumen
+        if mode == 'pg':
+            cur.execute("SELECT id, nombre, stock_actual FROM productos WHERE activo=TRUE ORDER BY nombre")
+        else:
+            cur.execute("SELECT id, nombre, stock_actual FROM productos WHERE activo=TRUE ORDER BY nombre")
+        rows = cur.fetchall()
+        resumen = [{'id': r[0] if isinstance(r,tuple) else r['id'],
+                    'nombre': r[1] if isinstance(r,tuple) else r['nombre'],
+                    'stock': r[2] if isinstance(r,tuple) else r['stock_actual']} for r in rows]
+        return jsonify({'ok': True, 'productos': resumen,
+                        'mensaje': f'Stock recalculado para {len(resumen)} productos.'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
 @app.route('/api/export/stock')
 @login_required
 def export_stock():
