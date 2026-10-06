@@ -30,6 +30,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF3F0;min-height:100vh
 .btn-green:hover{background:#1a6b52}
 .btn-out{background:#fff;color:#0D4F3C;border:1px solid #0D4F3C;padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap}
 .btn-out:hover{background:#f0f7f4}
+.btn-cuadrar{background:#fff3e0;color:#e65100;border:1px solid #ffb74d;padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;font-weight:600}
+.btn-cuadrar:hover{background:#ffe0b2}
 .table-wrap{background:#fff;border-radius:12px;border:1px solid #D4E4DC;overflow:auto;box-shadow:0 1px 4px rgba(13,79,60,0.06)}
 table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
 th{background:#0D4F3C;color:#fff;padding:10px 12px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.3px}
@@ -147,7 +149,21 @@ tr:hover td{background:#F0F7F3}
     </select>
     <button class="btn-out" onclick="window.location='/api/export/stock'">📥 Stock Excel</button>
     <button class="btn-out" onclick="window.location='/movimientos'">📋 Ver Movimientos</button>
+    {% if rol == 'admin' %}<button class="btn-cuadrar" onclick="cuadrarStock()">⚖️ Cuadrar Stock</button>{% endif %}
     {% if rol == 'admin' %}<button class="btn-green" onclick="abrirModalProducto()">+ Producto</button>{% endif %}
+  </div>
+
+  <!-- Modal cuadrar stock -->
+  <div id="modal-cuadrar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:14px;padding:28px 32px;max-width:480px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+      <h3 style="margin:0 0 10px;color:#0D4F3C;font-size:1.1rem">⚖️ Cuadrar Stock</h3>
+      <p style="font-size:.9rem;color:#444;margin:0 0 18px">Esto recalcula el stock de <strong>todos los productos</strong> desde cero, sumando guías de entrada y restando guías de salida registradas.<br><br>El stock manual registrado como movimiento <em>no</em> se considera — solo las guías.</p>
+      <div id="cuadrar-resultado" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:8px;font-size:.85rem;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('modal-cuadrar').style.display='none'" style="padding:8px 18px;border-radius:8px;border:1px solid #ccc;background:#f5f5f5;cursor:pointer;font-size:.9rem">Cancelar</button>
+        <button id="btn-confirmar-cuadrar" onclick="confirmarCuadrar()" style="padding:8px 20px;border-radius:8px;border:none;background:#0D4F3C;color:#fff;cursor:pointer;font-size:.9rem;font-weight:600">✅ Confirmar y recalcular</button>
+      </div>
+    </div>
   </div>
 
   <div class="table-wrap">
@@ -594,6 +610,44 @@ function verQR(id, nombre){
 }
 
 function cerrarModal(id){ document.getElementById(id).classList.remove('show'); }
+
+// ── Cuadrar Stock ──────────────────────────────────────────────────────────────
+function cuadrarStock(){
+  const modal = document.getElementById('modal-cuadrar');
+  document.getElementById('cuadrar-resultado').style.display = 'none';
+  document.getElementById('btn-confirmar-cuadrar').disabled = false;
+  document.getElementById('btn-confirmar-cuadrar').textContent = '✅ Confirmar y recalcular';
+  modal.style.display = 'flex';
+}
+
+async function confirmarCuadrar(){
+  const btn = document.getElementById('btn-confirmar-cuadrar');
+  btn.disabled = true;
+  btn.textContent = '⏳ Calculando...';
+  try {
+    const res = await fetch('/api/admin/cuadrar_stock', {method:'POST', headers:{'Content-Type':'application/json'}});
+    const data = await res.json();
+    const el = document.getElementById('cuadrar-resultado');
+    if(data.ok){
+      el.style.background = '#E8F5E9'; el.style.color = '#1B5E20'; el.style.border = '1px solid #A5D6A7';
+      el.innerHTML = `✅ <strong>${data.mensaje}</strong>`;
+      el.style.display = 'block';
+      btn.textContent = '✅ Listo';
+      setTimeout(() => {
+        document.getElementById('modal-cuadrar').style.display = 'none';
+        cargarProductos(); cargarStats(); cargarBanner();
+      }, 1800);
+    } else {
+      el.style.background = '#FFEBEE'; el.style.color = '#B71C1C'; el.style.border = '1px solid #EF9A9A';
+      el.innerHTML = `❌ Error: ${data.error || 'desconocido'}`;
+      el.style.display = 'block';
+      btn.disabled = false; btn.textContent = '✅ Confirmar y recalcular';
+    }
+  } catch(e){
+    alert('Error de conexión: ' + e);
+    btn.disabled = false; btn.textContent = '✅ Confirmar y recalcular';
+  }
+}
 
 cargarStats();
 cargarProductos();
