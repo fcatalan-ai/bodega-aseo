@@ -1721,6 +1721,334 @@ def procesar_factura():
     return jsonify({'ok': True, 'procesados': procesados, 'errores': errores})
 
 
+# ── GUIAS DE DESPACHO (PROVEEDOR) ────────────────────────────────────────────
+
+@app.route('/guia_despacho')
+@operador_required
+def guia_despacho_page():
+    return render_template('guia_despacho.html', user=session['user'], rol=session['rol'])
+
+@app.route('/api/guias_despacho/parsear', methods=['POST'])
+@operador_required
+def parsear_guia_despacho():
+    """Parsea una Guia de Despacho de proveedor (PDF) y retorna los productos extraidos."""
+    if 'archivo' not in request.files:
+        return jsonify({'error': 'No se envio archivo'}), 400
+    file = request.files['archivo']
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({'error': 'Solo se aceptan archivos PDF'}), 400
+    try:
+        try:
+            import pdfplumber
+        except ImportError:
+            import subprocess, sys
+            subprocess.run([sys.executable, '-m', 'pip', 'install', 'pdfplumber', '--break-system-packages', '-q'])
+            import pdfplumber
+
+        import re
+
+        pdf_bytes = file.read()
+        pdf_filename = file.filename or 'guia_despacho.pdf'
+        # Subir a Cloudinary
+        cloudinary_url_result = cloudinary_upload_pdf(pdf_bytes, pdf_filename)
+
+        meta = {'numero': '', 'proveedor': '', 'rut_proveedor': '',
+                'fecha': '', 'neto': 0, 'iva': 0, 'total': 0, 'tipo_doc': 'Guia de Despacho'}
+        rows_parsed = []
+
+        UNIT_ABBREVS = {
+            'UNID','UN','UNI','KG','KGS','LT','LTS','ML','GR','MTR','M','M2','PZA','PZ',
+            'CAJA','PACK','ROLLO','BOLSA','SACO','FRASCO','TARRO','GALON','LITRO',
+            'LIBRA','KILO','UND','PIEZA','PAR','JUEGO','SET'
+        }
+
+        SKIP_KW = [
+            'DESCRIPCION','DESCRIPCIÓN','CANTIDAD','PRECIO','VALOR','UNITARIO','CODIGO',
+            'MONTO NETO','MONTO','I.V.A','IVA','TOTAL','NETO','SUBTOTAL','SUB TOTAL',
+            'FORMA DE PAGO','TIMBRE','SEÑOR','SEÑORES','R.U.T','RUT:','GIRO','DIRECC',
+            'COMUN','CIUDAD','TIPO','GUIA','GUÍA','DESPACHO','ELECTRONICA','ELECTRÓNICA',
+            'S.I.I','SII','TRASLADO','RAZON SOCIAL','RAZÓN','CORPORACION','CORPORACIÓN',
+            'COLEGIO','ARRIEROS','EMAIL','TELEFONO','TELÉFONO','RESOLUCION','RESOLUCIÓN',
+            'VERIFIQUE','FECHA','FOLIO','CONTACTO','ORDEN DE COMPRA','GENERADO',
+            'SUPERFACTURA','SON:','DIECISEIS','VEINTE','TREINTA','CUARENTA','CINCUENTA',
+            'SESENTA','SETENTA','OCHENTA','NOVENTA','CIEN','MIL','PESOS',
+        ]
+
+        def cl_int(s):
+            """Convierte '14.000' o '14,000' a 14000."""
+            c = s.replace('.', '').replace(',', '')
+            try:
+                return int(c)
+            except Exception:
+                return None
+
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            page = pdf.pages[0]
+            text = page.extract_text() or ''
+            lines = [l.strip() for l in text.split('\n') if l.strip()]
+
+            # N° documento
+            m = re.search(r'N[°oº]?\s*(\d+)', text, re.IGNORECASE)
+            if m:
+                meta['numero'] = m.group(1)
+
+            # Fecha dd-mm-yyyy o variantes
+            meses_map = {'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06',
+                         'julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12'}
+            m = re.search(r'(\d{1,2})\s+de\s+(\w+)\s+del?\s+(\d{4})', text, re.IGNORECASE)
+            if m:
+                d2, mon, y2 = m.group(1), m.group(2).lower(), m.group(3)
+                meta['fecha'] = f"{d2.zfill(2)}-{meses_map.get(mon,'01')}-{y2}"
+            else:
+                m = re.search(r'(\d{2})[/-](\d{2})[/-](\d{4})', text)
+                if m:
+                    meta['fecha'] = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+
+            # RUT proveedor (primer RUT que aparece)
+            rut_m = re.search(r'R\.?U\.?T\.?\s*:?\s*([\d.]+[-\dkK])', text, re.IGNORECASE)
+            if rut_m:
+                meta['rut_proveedor'] = rut_m.group(1)
+
+            # Proveedor: primera linea larga sin keywords
+            skip_prov = ['R.U.T','RUT:','SEÑOR','GIRO','DIRECC','COMUN','TIPO','GUIA','GUÍA',
+                         'DESPACHO','SII','ELECTRONICA','ELECTRÓNICA','CORPORACION','COLEGIO',
+                         'N°','FOLIO']
+            for ln in lines[:20]:
+                if len(ln) > 5 and not any(kw in ln.upper() for kw in skip_prov):
+                    meta['proveedor'] = ln
+                    break
+
+            # Totales
+            def parse_monto(pattern):
+                m2 = re.search(pattern, text, re.IGNORECASE)
+                if m2:
+                    v = m2.group(1).replace('.','').replace(',','').strip()
+                    try: return int(v)
+                    except: return 0
+                return 0
+            meta['neto']  = parse_monto(r'Neto\s+([\d.,]+)')
+            meta['iva']   = parse_monto(r'IVA\s*\(?19%\)?\s*([\d.,]+)')
+            meta['total'] = parse_monto(r'Total\s+([\d.,]+)')
+
+            # ── Parser de items ──────────────────────────────────────────────
+            # Formato guia de despacho: "{qty} {UNIT?} {descripcion...} {precio_unit} {total}"
+            # Ej: "10.00 UNID SOPAPO MANGO MADERA 1.400 14.000"
+            for ln in lines:
+                ln_s = ln.strip()
+                if not ln_s or len(ln_s) < 5: continue
+                ln_upper = ln_s.upper()
+                if any(kw in ln_upper for kw in SKIP_KW): continue
+
+                tokens = ln_s.split()
+                if len(tokens) < 3: continue
+
+                # El primer token debe ser un numero (cantidad)
+                try:
+                    qty_raw = tokens[0].replace(',', '.')
+                    qty = float(qty_raw)
+                    if qty <= 0 or qty > 99999:
+                        continue
+                except ValueError:
+                    continue
+
+                # Segundo token puede ser abreviatura de unidad
+                rest_start = 1
+                if len(tokens) > 1 and tokens[1].upper() in UNIT_ABBREVS:
+                    rest_start = 2
+
+                # Necesitamos al menos descripcion + 1 numero al final
+                if len(tokens) <= rest_start + 1:
+                    continue
+
+                # Los ultimos 1 o 2 tokens son numeros (total, o precio+total)
+                precio_unit = 0
+                total_item  = 0
+                desc_end    = len(tokens)
+
+                # Intenta 2 numeros al final (precio_unit + total)
+                n2 = cl_int(tokens[-1])
+                n1 = cl_int(tokens[-2]) if len(tokens) >= rest_start + 3 else None
+
+                if n2 is not None and n2 > 0 and n1 is not None and n1 > 0:
+                    precio_unit = n1
+                    total_item  = n2
+                    desc_end    = len(tokens) - 2
+                elif n2 is not None and n2 > 0:
+                    total_item  = n2
+                    desc_end    = len(tokens) - 1
+                else:
+                    continue
+
+                descripcion = ' '.join(tokens[rest_start:desc_end]).strip()
+                if len(descripcion) < 2 or not any(c.isalpha() for c in descripcion):
+                    continue
+
+                rows_parsed.append({
+                    'nombre_factura': descripcion,
+                    'cantidad': max(1, int(qty)),
+                    'precio_unit': precio_unit,
+                    'valor': total_item,
+                })
+
+        # Matching con productos de bodega
+        productos = db_fetchall(
+            "SELECT id, nombre, categoria, unidad FROM productos WHERE activo=TRUE ORDER BY nombre")
+
+        def normalizar(s):
+            import unicodedata
+            s = s.lower().strip()
+            s = unicodedata.normalize('NFD', s)
+            s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+            return s
+
+        for row in rows_parsed:
+            nf = normalizar(row['nombre_factura'])
+            best_match = None
+            best_score = 0.0
+            for p in productos:
+                np = normalizar(p['nombre'])
+                if nf == np:
+                    score = 1.0
+                elif nf in np or np in nf:
+                    score = 0.85
+                else:
+                    wf = set(nf.split())
+                    wp = set(np.split())
+                    overlap = len(wf & wp)
+                    score = (overlap / max(len(wf), len(wp))) * 0.7 if overlap else 0
+                if score > best_score:
+                    best_score = score
+                    best_match = p
+            if best_match and best_score >= 0.3:
+                row['producto_id']     = best_match['id']
+                row['producto_nombre'] = best_match['nombre']
+                row['match_score']     = round(best_score, 2)
+            else:
+                row['producto_id']     = None
+                row['producto_nombre'] = ''
+                row['match_score']     = 0.0
+
+        return jsonify({'ok': True, 'meta': meta, 'rows': rows_parsed,
+                        'productos': productos, 'cloudinary_url': cloudinary_url_result})
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'detalle': traceback.format_exc()}), 500
+
+
+@app.route('/api/guias_despacho/procesar', methods=['POST'])
+@operador_required
+def procesar_guia_despacho():
+    """Registra entradas de stock a partir de una guia de despacho parseada."""
+    import json as _json
+    d = request.json
+    meta = d.get('meta', {})
+    rows = d.get('rows', [])
+    cloudinary_url_recv = d.get('cloudinary_url') or ''
+
+    fecha_mov = meta.get('fecha') or datetime.now().strftime('%d-%m-%Y')
+    num       = meta.get('numero', '?')
+    proveedor = meta.get('proveedor', '')
+    obs_base  = f"[G.Despacho N°{num} | {proveedor}]"
+
+    procesados = 0
+    errores    = []
+    conn2, mode2 = get_db()
+    cur2 = conn2.cursor()
+    try:
+        for row in rows:
+            pid      = row.get('producto_id')
+            cant     = int(row.get('cantidad', 0))
+            nombre_n = (row.get('nombre_nuevo') or '').strip()
+            if cant <= 0:
+                continue
+            # Crear producto si no existe y viene nombre_nuevo
+            if not pid and nombre_n:
+                try:
+                    if mode2 == 'pg':
+                        cur2.execute(
+                            "INSERT INTO productos (nombre,categoria,unidad,stock_actual,stock_minimo) VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                            (nombre_n, 'Varios', 'unidades', 0, 0))
+                        pid = cur2.fetchone()[0]
+                    else:
+                        cur2.execute(
+                            "INSERT INTO productos (nombre,categoria,unidad,stock_actual,stock_minimo) VALUES (?,?,?,?,?)",
+                            (nombre_n, 'Varios', 'unidades', 0, 0))
+                        pid = cur2.lastrowid
+                    row['producto_id'] = pid
+                except Exception as e_crea:
+                    errores.append(f"No se pudo crear '{nombre_n}': {e_crea}")
+                    continue
+            if not pid:
+                continue
+            try:
+                if mode2 == 'pg':
+                    cur2.execute(
+                        "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                        (pid, 'entrada', cant, '', session['user'], obs_base, fecha_mov))
+                    cur2.execute(
+                        "UPDATE productos SET stock_actual=stock_actual+%s WHERE id=%s", (cant, pid))
+                else:
+                    cur2.execute(
+                        "INSERT INTO movimientos (producto_id,tipo,cantidad,edificio,usuario,observacion,fecha) VALUES (?,?,?,?,?,?,?)",
+                        (pid, 'entrada', cant, '', session['user'], obs_base, fecha_mov))
+                    cur2.execute(
+                        "UPDATE productos SET stock_actual=stock_actual+? WHERE id=?", (cant, pid))
+                procesados += 1
+            except Exception as e2:
+                errores.append(str(e2))
+        conn2.commit()
+    finally:
+        conn2.close()
+
+    # Registrar en guias_entrada
+    if procesados > 0:
+        items_list = []
+        for row in rows:
+            pid  = row.get('producto_id')
+            cant = int(row.get('cantidad', 0))
+            if not pid or cant <= 0:
+                continue
+            nombre_prod = (row.get('nombre_nuevo') or row.get('nombre_factura') or '').strip()
+            if not nombre_prod and pid:
+                p = db_fetchone("SELECT nombre FROM productos WHERE id=?", (int(pid),))
+                if p:
+                    nombre_prod = p.get('nombre', '')
+            items_list.append({
+                'nombre': nombre_prod, 'cantidad': cant,
+                'precio_unit': int(row.get('precio_unit', 0)),
+                'valor': int(row.get('valor', 0)),
+                'producto_id': pid
+            })
+        total_neto = meta.get('neto', 0) or sum(i['valor'] for i in items_list)
+        total_iva  = meta.get('iva', 0)
+        total_tot  = meta.get('total', 0) or (total_neto + total_iva)
+        guia_id    = f"GD-{num}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        conn3, mode3 = get_db()
+        cur3 = conn3.cursor()
+        try:
+            if mode3 == 'pg':
+                cur3.execute(
+                    "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json,cloudinary_url) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (guia_id, fecha_mov, proveedor, f"Guia Despacho N°{num}",
+                     session['user'], total_neto, total_iva, total_tot,
+                     'guia_despacho', _json.dumps(items_list, ensure_ascii=False), cloudinary_url_recv))
+            else:
+                cur3.execute(
+                    "INSERT INTO guias_entrada (guia_id,fecha,proveedor,observacion,usuario,total_neto,total_iva,total,origen,items_json,cloudinary_url) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    (guia_id, fecha_mov, proveedor, f"Guia Despacho N°{num}",
+                     session['user'], total_neto, total_iva, total_tot,
+                     'guia_despacho', _json.dumps(items_list, ensure_ascii=False), cloudinary_url_recv))
+            conn3.commit()
+        except Exception:
+            pass
+        finally:
+            conn3.close()
+
+    return jsonify({'ok': True, 'procesados': procesados, 'errores': errores})
+
+
 # ── GUIAS ENTRADA API ─────────────────────────────────────────────────────────
 @app.route('/api/guias_entrada', methods=['GET'])
 @login_required
