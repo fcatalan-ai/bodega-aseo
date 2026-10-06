@@ -10,23 +10,27 @@ DATABASE_URL = os.environ.get('DATABASE_URL', '')
 # ── Cloudinary ────────────────────────────────────────────────────────────────
 CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '')
 
-def cloudinary_upload_pdf(pdf_bytes, filename):
-    """Sube un PDF a Cloudinary y retorna la URL segura. Retorna None si falla."""
+def cloudinary_upload_pdf(pdf_bytes, filename, subfolder='facturas'):
+    """
+    Sube un PDF a Cloudinary en bodega_aseo/<subfolder>/ y retorna la URL segura.
+    Para resource_type='raw', NO se usa 'format' — Cloudinary lo infiere del public_id.
+    El public_id incluye la extensión .pdf para que el archivo quede en la carpeta correcta.
+    """
     if not CLOUDINARY_URL:
         return None
     try:
         import cloudinary, cloudinary.uploader
         cloudinary.config(cloudinary_url=CLOUDINARY_URL)
-        folder = 'bodega_aseo/facturas'
-        public_id = f"{folder}/{os.path.splitext(filename)[0]}"
+        folder = f'bodega_aseo/{subfolder}'
+        # Para raw, el public_id DEBE incluir la extensión para que Cloudinary
+        # coloque el archivo en la carpeta correcta y lo sirva como PDF.
+        basename = os.path.splitext(filename)[0]
+        public_id = f"{folder}/{basename}.pdf"
         result = cloudinary.uploader.upload(
             io.BytesIO(pdf_bytes),
             resource_type='raw',
             public_id=public_id,
-            format='pdf',
             overwrite=True,
-            use_filename=True,
-            unique_filename=False,
             access_mode='public',
             type='upload',
         )
@@ -1839,8 +1843,8 @@ def parsear_guia_despacho():
 
         pdf_bytes = file.read()
         pdf_filename = file.filename or 'guia_despacho.pdf'
-        # Subir a Cloudinary
-        cloudinary_url_result = cloudinary_upload_pdf(pdf_bytes, pdf_filename)
+        # Subir a Cloudinary en subcarpeta guias_despacho
+        cloudinary_url_result = cloudinary_upload_pdf(pdf_bytes, pdf_filename, subfolder='guias_despacho')
 
         meta = {'numero': '', 'proveedor': '', 'rut_proveedor': '',
                 'fecha': '', 'neto': 0, 'iva': 0, 'total': 0, 'tipo_doc': 'Guia de Despacho'}
