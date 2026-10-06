@@ -987,6 +987,13 @@ def dashboard():
     return render_template('dashboard.html', user=session['user'], rol=session['rol'])
 
 # ── EXPORT ────────────────────────────────────────────────────────────────────
+@app.route('/api/admin/reset_stock', methods=['POST'])
+@admin_required
+def reset_stock_cero():
+    """Resetea todo el stock a 0. Usar solo cuando se han borrado todos los movimientos/guías."""
+    db_run("UPDATE productos SET stock_actual=0 WHERE activo=TRUE")
+    return jsonify({'ok': True, 'mensaje': 'Stock reseteado a 0 para todos los productos.'})
+
 @app.route('/api/export/stock')
 @login_required
 def export_stock():
@@ -2476,10 +2483,29 @@ def editar_guia_salida(gid):
 @app.route('/api/guias_salida/<int:gid>', methods=['DELETE'])
 @admin_required
 def eliminar_guia_salida(gid):
-    """Elimina el registro de guía de salida (el stock ya fue descontado vía movimientos)."""
+    """Elimina el registro de guía de salida y REVIERTE el stock descontado."""
+    import json as _json
+    guia = db_fetchone("SELECT items_json FROM guias_salida WHERE id=?", (gid,))
+    if not guia:
+        return jsonify({'error': 'No encontrada'}), 404
+    items = []
+    try:
+        items = _json.loads(guia.get('items_json') or '[]')
+    except Exception:
+        pass
     conn, mode = get_db()
     cur = conn.cursor()
     try:
+        # Revertir stock: devolver las cantidades que fueron descontadas
+        for item in items:
+            pid  = item.get('producto_id')
+            cant = int(item.get('cantidad', 0))
+            if not pid or cant <= 0:
+                continue
+            if mode == 'pg':
+                cur.execute("UPDATE productos SET stock_actual=stock_actual+%s WHERE id=%s", (cant, pid))
+            else:
+                cur.execute("UPDATE productos SET stock_actual=stock_actual+? WHERE id=?", (cant, pid))
         if mode == 'pg':
             cur.execute("DELETE FROM guias_salida WHERE id=%s", (gid,))
         else:
