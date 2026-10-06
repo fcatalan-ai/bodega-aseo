@@ -1818,17 +1818,17 @@ def parsear_guia_despacho():
                     meta['proveedor'] = ln
                     break
 
-            # Totales
-            def parse_monto(pattern):
-                m2 = re.search(pattern, text, re.IGNORECASE)
-                if m2:
-                    v = m2.group(1).replace('.','').replace(',','').strip()
+            # Totales — usamos la ÚLTIMA coincidencia para evitar capturar encabezados de columna
+            def parse_monto_last(pattern):
+                matches = re.findall(pattern, text, re.IGNORECASE)
+                if matches:
+                    v = matches[-1].replace('.','').replace(',','').strip()
                     try: return int(v)
                     except: return 0
                 return 0
-            meta['neto']  = parse_monto(r'Neto\s+([\d.,]+)')
-            meta['iva']   = parse_monto(r'IVA\s*\(?19%\)?\s*([\d.,]+)')
-            meta['total'] = parse_monto(r'Total\s+([\d.,]+)')
+            meta['neto']  = parse_monto_last(r'Neto\s+([\d.,]+)')
+            meta['iva']   = parse_monto_last(r'IVA\s*\(?19%\)?\s*([\d.,]+)')
+            meta['total'] = parse_monto_last(r'Total\s+([\d.,]+)')
 
             # ── Parser de items ──────────────────────────────────────────────
             # Formato guia de despacho: "{qty} {UNIT?} {descripcion...} {precio_unit} {total}"
