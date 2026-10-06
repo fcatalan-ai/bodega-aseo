@@ -98,12 +98,13 @@ input.price-inp{text-align:right;max-width:110px}
 .badge-origen{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:10px;font-weight:600;margin-left:6px}
 .badge-manual{background:#1e3828;color:#98e6b0;border:1px solid #2a5040}
 .badge-factura{background:#1e1e3b;color:#c9a0ff;border:1px solid #3a3060}
+.badge-guia{background:#1e2f3b;color:#81d4fa;border:1px solid #1a4a6a}
 .hist-card{background:var(--panel2);border:1px solid var(--borde);border-radius:10px;margin-bottom:10px;overflow:hidden}
 .hist-card-head{padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;user-select:none}
 .hist-card-head:hover{background:#1e3828}
 .hist-card-head .hid{font-size:.78rem;color:var(--txt2);font-family:monospace}
 .hist-card-head .hfecha{font-size:.8rem;color:#aaa}
-.hist-card-head .hprov{font-size:.85rem;color:#fff;font-weight:600;flex:1}
+.hist-card-head .hprov{font-size:.85rem;color:var(--txt);font-weight:600;flex:1}
 .hist-card-head .htotal{font-size:.85rem;color:var(--verde);font-weight:700;text-align:right}
 .hist-card-head .harrow{color:#444;font-size:.75rem;transition:transform .2s}
 .btn-eliminar-guia{background:none;border:none;cursor:pointer;font-size:.9rem;padding:2px 6px;border-radius:5px;color:#c44;opacity:.6;transition:opacity .15s,background .15s;line-height:1}
@@ -150,6 +151,7 @@ input.price-inp{text-align:right;max-width:110px}
     {% if rol == 'admin' %}<a href="/facturas">🧾 Facturas</a>{% endif %}
     <a href="/guia">📄 Guía Salida</a>
     {% if rol in ('admin','operador') %}<a href="/guia_entrada" class="active">📥 Guía Entrada</a>{% endif %}
+    {% if rol in ('admin','operador') %}<a href="/guia_despacho">🚚 G. Despacho</a>{% endif %}
   </div>
   <div class="topbar-right">
     <span class="user-pill">👤 {{ user }}</span>
@@ -592,9 +594,9 @@ async function cargarHistorial() {
 }
 
 function renderGuiaCard(g) {
-  const origen = g.origen === 'factura' ? 'factura' : 'manual';
-  const badgeCls = origen === 'factura' ? 'badge-factura' : 'badge-manual';
-  const badgeTxt = origen === 'factura' ? '🧾 Factura' : '✏️ Manual';
+  const origen = g.origen === 'factura' ? 'factura' : g.origen === 'guia_despacho' ? 'guia_despacho' : 'manual';
+  const badgeCls = origen === 'factura' ? 'badge-factura' : origen === 'guia_despacho' ? 'badge-guia' : 'badge-manual';
+  const badgeTxt = origen === 'factura' ? '🧾 Factura' : origen === 'guia_despacho' ? '🚚 G. Despacho' : '✏️ Manual';
   const total = (g.total || 0).toLocaleString('es-CL');
   const items = (g.items || []);
   const itemsHtml = items.length ? `
@@ -606,8 +608,8 @@ function renderGuiaCard(g) {
             <tr>
               <td>${it.nombre || '—'}</td>
               <td>${it.cantidad || 0}</td>
-              <td>$${(it.precio_unit||0).toLocaleString('es-CL')}</td>
-              <td>$${(it.valor||it.cantidad*it.precio_unit||0).toLocaleString('es-CL')}</td>
+              <td>${it.precio_unit > 0 ? '$'+it.precio_unit.toLocaleString('es-CL') : '—'}</td>
+              <td>${(it.valor||(it.cantidad*it.precio_unit)||0) > 0 ? '$'+(it.valor||(it.cantidad*it.precio_unit)).toLocaleString('es-CL') : '—'}</td>
             </tr>`).join('')}
         </tbody>
       </table>
