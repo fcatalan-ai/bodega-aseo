@@ -2605,23 +2605,22 @@ def eliminar_guia_salida(gid):
 @login_required
 def ver_pdf():
     """
-    Proxy para servir PDFs de Cloudinary.
-    Cloudinary restringe raw/upload incluso server-side a menos que se use URL firmada.
-    Generamos una URL firmada con las credenciales de la cuenta y hacemos fetch desde ahí.
+    Genera una URL firmada de Cloudinary y redirige el navegador a ella.
+    Las URLs firmadas bypass las restricciones ACL de la cuenta.
+    Si no hay CLOUDINARY_URL configurada, redirige directo a la URL original.
     """
-    import re, urllib.request, urllib.error
+    import re
+    from flask import redirect as flask_redirect
     url = request.args.get('url', '').strip()
     if not url or 'cloudinary.com' not in url:
         return 'URL inválida', 400
-
-    fetch_url = url  # fallback: intentar con la URL original
 
     if CLOUDINARY_URL:
         try:
             import cloudinary, cloudinary.utils
             cloudinary.config(cloudinary_url=CLOUDINARY_URL)
-            # Extraer public_id desde la URL:
-            # https://res.cloudinary.com/<cloud>/raw/upload/v<ver>/<public_id>
+            # Extraer public_id desde la URL de Cloudinary
+            # Formato: https://res.cloudinary.com/<cloud>/raw/upload/v<ver>/<public_id>
             m = re.search(r'/raw/upload/(?:v\d+/)?(.+)$', url)
             if m:
                 public_id = m.group(1)  # e.g. bodega_aseo/facturas/F_144_CCT.pdf
@@ -2630,27 +2629,47 @@ def ver_pdf():
                     resource_type='raw',
                     type='upload',
                     sign_url=True,
+                    secure=True,
                 )
                 if signed:
-                    fetch_url = signed
+                    print(f'[ver_pdf] Redirigiendo a URL firmada: {signed[:80]}...')
+                    return flask_redirect(signed)
         except Exception as e_sign:
-            print(f'[ver_pdf] No se pudo generar URL firmada: {e_sign}')
+            print(f'[ver_pdf] Error generando URL firmada: {e_sign}')
 
+    # Fallback: redirigir a la URL original
+    return flask_redirect(url)
+
+
+@app.route('/debug_cloudinary')
+@admin_required
+def debug_cloudinary():
+    """Diagnóstico: verifica la configuración de Cloudinary y prueba generar una URL firmada."""
+    import re
+    info = {'cloudinary_url_set': bool(CLOUDINARY_URL)}
+    if not CLOUDINARY_URL:
+        return jsonify(info)
     try:
-        req = urllib.request.Request(fetch_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            pdf_bytes = resp.read()
-        # Extraer nombre de archivo para la descarga
-        fname = url.split('/')[-1] or 'documento.pdf'
-        return send_file(
-            io.BytesIO(pdf_bytes),
-            mimetype='application/pdf',
-            as_attachment=False,
-            download_name=fname
-        )
+        import cloudinary, cloudinary.utils, cloudinary.api
+        cloudinary.config(cloudinary_url=CLOUDINARY_URL)
+        cfg = cloudinary.config()
+        info['cloud_name'] = cfg.cloud_name
+        info['api_key'] = cfg.api_key[:6] + '...' if cfg.api_key else None
+        info['api_secret_set'] = bool(cfg.api_secret)
+        # Intentar listar 1 recurso raw para verificar credenciales
+        try:
+            res = cloudinary.api.resources(resource_type='raw', max_results=1, prefix='bodega_aseo')
+            info['api_access'] = 'ok'
+            info['sample_resource'] = res.get('resources', [{}])[0].get('public_id', 'none')
+            if res.get('resources'):
+                pid = res['resources'][0]['public_id']
+                signed, _ = cloudinary.utils.cloudinary_url(pid, resource_type='raw', type='upload', sign_url=True, secure=True)
+                info['signed_url_example'] = signed
+        except Exception as e_api:
+            info['api_access'] = f'error: {e_api}'
     except Exception as e:
-        return f'No se pudo obtener el PDF: {e}', 502
-
+        info['error'] = str(e)
+    return jsonify(info)
 
 if __name__=='__main__':
     init_db()
