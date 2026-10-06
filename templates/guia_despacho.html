@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guía de Despacho — Bodega Aseo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f0f4f8;min-height:100vh;color:#1a1a1a}
+/* Nav */
+.topbar{background:#0D4F3C;color:#fff;padding:0 20px;display:flex;align-items:center;height:52px;gap:16px}
+.topbar a{color:rgba(255,255,255,.75);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:6px;transition:.15s}
+.topbar a:hover{background:rgba(255,255,255,.1);color:#fff}
+.topbar .brand{font-weight:700;font-size:15px;color:#fff;margin-right:8px}
+.topbar .spacer{flex:1}
+.topbar .user{font-size:12px;opacity:.7}
+/* Layout */
+.main{max-width:900px;margin:0 auto;padding:20px 16px}
+h2{font-size:20px;font-weight:700;margin-bottom:4px;color:#0D4F3C}
+.subtitle{font-size:13px;color:#888;margin-bottom:20px}
+/* Upload zone */
+.upload-zone{border:2px dashed #b0c8c0;border-radius:14px;background:#fff;padding:36px 24px;text-align:center;cursor:pointer;transition:.2s;margin-bottom:18px;position:relative}
+.upload-zone:hover,.upload-zone.drag{border-color:#0D4F3C;background:#f0f7f4}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.upload-icon{font-size:38px;margin-bottom:10px}
+.upload-label{font-size:15px;font-weight:600;color:#0D4F3C;margin-bottom:4px}
+.upload-hint{font-size:12px;color:#888}
+/* Cards */
+.card{background:#fff;border-radius:12px;border:1px solid #e5e8ed;padding:18px;margin-bottom:14px}
+.card-title{font-size:12px;font-weight:700;color:#0D4F3C;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #f0f0f0}
+/* Meta grid */
+.meta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.meta-item label{font-size:11px;color:#888;font-weight:600;display:block;margin-bottom:2px}
+.meta-item span{font-size:14px;font-weight:600;color:#1a1a1a}
+.meta-item input{width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px}
+.meta-item input:focus{outline:none;border-color:#0D4F3C}
+/* Tabla productos */
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:#0D4F3C;color:#fff;padding:8px 10px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.04em}
+tbody tr:nth-child(odd){background:#fafafa}
+tbody tr:hover{background:#f0f7f4}
+td{padding:8px 10px;vertical-align:middle;border-bottom:1px solid #f0f0f0}
+.badge-match{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;display:inline-block}
+.badge-ok{background:#E2EFDA;color:#27500A}
+.badge-warn{background:#FFF2CC;color:#7a5c00}
+.badge-no{background:#FCEBEB;color:#791F1F}
+select.prod-sel{width:100%;padding:5px 8px;border:1.5px solid #ddd;border-radius:7px;font-size:12px;background:#fff}
+select.prod-sel:focus{outline:none;border-color:#0D4F3C}
+input.new-name{width:100%;padding:5px 8px;border:1.5px solid #FFC107;border-radius:7px;font-size:12px;background:#FFFDE7}
+td.cant-cell{font-weight:700;color:#0D4F3C;text-align:center}
+td.precio-cell,td.total-cell{text-align:right;color:#555;font-size:12px}
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:9px;border:none;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-primary{background:#0D4F3C;color:#fff}
+.btn-primary:hover{background:#0a3d2e}
+.btn-primary:disabled{background:#aaa;cursor:not-allowed}
+.btn-ghost{background:#f0f0f0;color:#333}
+.btn-ghost:hover{background:#e0e0e0}
+.btn-row{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+/* State */
+#panel-result{display:none}
+#panel-upload{display:block}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:600;z-index:999;display:none;max-width:92vw;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.toast.show{display:block;animation:ti .3s}
+.toast.success{background:#0D4F3C}
+.toast.error{background:#C00}
+@keyframes ti{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+/* Summary */
+.summary-box{background:#E2EFDA;border:1.5px solid #27500A;border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.summary-box .sum-num{font-size:28px;font-weight:800;color:#0D4F3C}
+.summary-box .sum-txt{font-size:13px;color:#27500A}
+/* Alertas */
+.alert{background:#FFF2CC;border:1px solid #FFCA28;border-radius:8px;padding:10px 14px;font-size:13px;color:#7a5c00;margin-bottom:12px}
+/* Responsive */
+@media(max-width:600px){
+  .meta-grid{grid-template-columns:1fr 1fr}
+  table,thead,tbody,tr,th,td{display:block}
+  thead{display:none}
+  td{border:none;padding:4px 6px}
+  td[data-label]::before{content:attr(data-label)": ";font-weight:700;color:#555;font-size:11px}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="brand">🧴 Bodega Aseo</span>
+  <a href="/">📦 Inventario</a>
+  <a href="/guia_entrada">📥 Entradas</a>
+  <a href="/facturas">🧾 Facturas</a>
+  <a href="/guia_despacho" style="background:rgba(255,255,255,.15);color:#fff">🚚 Guías Despacho</a>
+  <a href="/guia">📤 Salidas</a>
+  <div class="spacer"></div>
+  <span class="user">👤 {{ user }}</span>
+  <a href="/logout">Salir</a>
+</div>
+
+<div class="main">
+  <h2>🚚 Leer Guía de Despacho</h2>
+  <p class="subtitle">Sube el PDF de la guía de despacho del proveedor para registrar las entradas automáticamente</p>
+
+  <!-- PANEL UPLOAD -->
+  <div id="panel-upload">
+    <div class="upload-zone" id="dropzone" ondragover="ev.preventDefault();this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
+      <input type="file" id="pdf-input" accept=".pdf" onchange="handleFile(this.files[0])">
+      <div class="upload-icon">📄</div>
+      <div class="upload-label">Arrastra el PDF aquí o haz clic para seleccionar</div>
+      <div class="upload-hint">Solo archivos PDF — Guías de Despacho Electrónicas</div>
+    </div>
+    <div id="upload-status" style="text-align:center;font-size:13px;color:#888;margin-top:-6px"></div>
+  </div>
+
+  <!-- PANEL RESULTADO -->
+  <div id="panel-result">
+
+    <!-- Resumen -->
+    <div class="summary-box" id="summary-box">
+      <div class="sum-num" id="sum-num">0</div>
+      <div>
+        <div class="sum-txt" id="sum-txt">productos encontrados en la guía</div>
+        <div style="font-size:11px;color:#27500A;margin-top:2px" id="sum-unmatched"></div>
+      </div>
+    </div>
+
+    <!-- Datos guía -->
+    <div class="card">
+      <div class="card-title">📋 Datos de la Guía</div>
+      <div class="meta-grid">
+        <div class="meta-item">
+          <label>Proveedor</label>
+          <input type="text" id="m-proveedor">
+        </div>
+        <div class="meta-item">
+          <label>N° Guía</label>
+          <input type="text" id="m-numero">
+        </div>
+        <div class="meta-item">
+          <label>Fecha</label>
+          <input type="text" id="m-fecha" placeholder="dd-mm-yyyy">
+        </div>
+        <div class="meta-item">
+          <label>RUT Proveedor</label>
+          <input type="text" id="m-rut">
+        </div>
+        <div class="meta-item">
+          <label>Neto</label>
+          <input type="text" id="m-neto" readonly style="background:#f9f9f9">
+        </div>
+        <div class="meta-item">
+          <label>IVA</label>
+          <input type="text" id="m-iva" readonly style="background:#f9f9f9">
+        </div>
+        <div class="meta-item">
+          <label>Total</label>
+          <input type="text" id="m-total" readonly style="background:#f9f9f9">
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla productos -->
+    <div class="card">
+      <div class="card-title">📦 Productos en la Guía</div>
+      <div class="alert" id="alert-unmatched" style="display:none">
+        ⚠️ Algunos productos no fueron reconocidos. Puedes asignarlos manualmente o crearlos como nuevos.
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36%">Descripción en guía</th>
+              <th style="width:30%">Producto en bodega</th>
+              <th style="width:8%" class="cant-cell">Cant.</th>
+              <th style="width:13%">Precio unit.</th>
+              <th style="width:13%">Total</th>
+            </tr>
+          </thead>
+          <tbody id="rows-tbody"></tbody>
+        </table>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-procesar" onclick="procesar()">
+          ✅ Registrar entradas en bodega
+        </button>
+        <button class="btn btn-ghost" onclick="resetForm()">🔄 Subir otro PDF</button>
+      </div>
+    </div>
+
+  </div><!-- /panel-result -->
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let _meta = {}, _rows = [], _productos = [], _cloudinary_url = '';
+
+// ── Drag & drop ──────────────────────────────────────────────────────────────
+function handleDrop(ev){
+  ev.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag');
+  const f = ev.dataTransfer.files[0];
+  if(f && f.type === 'application/pdf') handleFile(f);
+  else toast('Solo se aceptan archivos PDF','error');
+}
+
+function handleFile(file){
+  if(!file) return;
+  if(!file.name.toLowerCase().endsWith('.pdf')){
+    toast('Solo se aceptan archivos PDF','error'); return;
+  }
+  const st = document.getElementById('upload-status');
+  st.innerHTML = '<span class="spinner" style="border-color:#0D4F3C33;border-top-color:#0D4F3C;width:14px;height:14px"></span> Leyendo PDF...';
+
+  const fd = new FormData();
+  fd.append('archivo', file);
+
+  fetch('/api/guias_despacho/parsear', {method:'POST', body: fd})
+    .then(r => r.json())
+    .then(d => {
+      st.textContent = '';
+      if(d.error){ toast('❌ ' + d.error, 'error', 5000); return; }
+      _meta    = d.meta    || {};
+      _rows    = d.rows    || [];
+      _productos = d.productos || [];
+      _cloudinary_url = d.cloudinary_url || '';
+      mostrarResultado();
+    })
+    .catch(() => { st.textContent=''; toast('Error de conexión','error'); });
+}
+
+// ── Render resultado ─────────────────────────────────────────────────────────
+function mostrarResultado(){
+  // Meta
+  document.getElementById('m-proveedor').value = _meta.proveedor || '';
+  document.getElementById('m-numero').value    = _meta.numero    || '';
+  document.getElementById('m-fecha').value     = _meta.fecha     || '';
+  document.getElementById('m-rut').value       = _meta.rut_proveedor || '';
+  document.getElementById('m-neto').value      = _meta.neto  ? fmtCLP(_meta.neto)  : '';
+  document.getElementById('m-iva').value       = _meta.iva   ? fmtCLP(_meta.iva)   : '';
+  document.getElementById('m-total').value     = _meta.total ? fmtCLP(_meta.total) : '';
+
+  // Resumen
+  const unmatched = _rows.filter(r => !r.producto_id).length;
+  document.getElementById('sum-num').textContent  = _rows.length;
+  document.getElementById('sum-txt').textContent  = `producto${_rows.length!==1?'s':''} encontrado${_rows.length!==1?'s':''} en la guía`;
+  document.getElementById('sum-unmatched').textContent = unmatched > 0
+    ? `⚠️ ${unmatched} sin coincidencia en bodega`
+    : `✅ Todos reconocidos en bodega`;
+  document.getElementById('alert-unmatched').style.display = unmatched > 0 ? '' : 'none';
+
+  // Filas
+  const tbody = document.getElementById('rows-tbody');
+  tbody.innerHTML = '';
+  _rows.forEach((row, i) => {
+    const matched  = !!row.producto_id;
+    const score    = row.match_score || 0;
+    const badgeCls = score >= 0.85 ? 'badge-ok' : score >= 0.3 ? 'badge-warn' : 'badge-no';
+    const badgeTxt = score >= 0.85 ? '✅ Coincide' : score >= 0.3 ? '⚠️ Parcial' : '❌ Sin match';
+
+    // Build producto select options
+    let opts = '<option value="">— Sin asignar —</option>'
+             + '<option value="_nuevo_">➕ Crear como nuevo producto</option>';
+    _productos.forEach(p => {
+      const sel = (p.id === row.producto_id) ? 'selected' : '';
+      opts += `<option value="${p.id}" ${sel}>${p.nombre} (${p.unidad})</option>`;
+    });
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td data-label="Descripción">
+        <div style="font-weight:600;font-size:12px">${esc(row.nombre_factura)}</div>
+        <span class="badge-match ${badgeCls}" style="margin-top:4px">${badgeTxt}</span>
+      </td>
+      <td data-label="Producto bodega">
+        <select class="prod-sel" id="sel-${i}" onchange="onSelChange(${i},this)">
+          ${opts}
+        </select>
+        <input class="new-name" id="new-${i}" placeholder="Nombre del nuevo producto..."
+               style="display:none;margin-top:4px">
+      </td>
+      <td class="cant-cell" data-label="Cant.">${row.cantidad}</td>
+      <td class="precio-cell" data-label="Precio unit.">${row.precio_unit ? fmtCLP(row.precio_unit) : '—'}</td>
+      <td class="total-cell" data-label="Total">${row.valor ? fmtCLP(row.valor) : '—'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('panel-upload').style.display = 'none';
+  document.getElementById('panel-result').style.display = 'block';
+}
+
+function onSelChange(i, sel){
+  const isNuevo = sel.value === '_nuevo_';
+  document.getElementById(`new-${i}`).style.display = isNuevo ? 'block' : 'none';
+  _rows[i].producto_id = isNuevo ? null : (sel.value ? parseInt(sel.value) : null);
+}
+
+// ── Procesar ─────────────────────────────────────────────────────────────────
+async function procesar(){
+  // Leer estado actual de selects
+  _rows.forEach((row, i) => {
+    const sel = document.getElementById(`sel-${i}`);
+    if(!sel) return;
+    if(sel.value === '_nuevo_'){
+      row.producto_id  = null;
+      row.nombre_nuevo = (document.getElementById(`new-${i}`).value || '').trim();
+    } else {
+      row.producto_id  = sel.value ? parseInt(sel.value) : null;
+      row.nombre_nuevo = '';
+    }
+  });
+
+  const activos = _rows.filter(r => r.producto_id || r.nombre_nuevo);
+  if(activos.length === 0){
+    toast('Asigna al menos un producto para continuar','error'); return;
+  }
+
+  // Leer meta editada
+  const metaFinal = {
+    proveedor: document.getElementById('m-proveedor').value.trim(),
+    numero:    document.getElementById('m-numero').value.trim(),
+    fecha:     document.getElementById('m-fecha').value.trim(),
+    neto:      _meta.neto, iva: _meta.iva, total: _meta.total
+  };
+
+  const btn = document.getElementById('btn-procesar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Registrando...';
+
+  try {
+    const r = await fetch('/api/guias_despacho/procesar', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({meta: metaFinal, rows: _rows, cloudinary_url: _cloudinary_url})
+    });
+    const d = await r.json();
+    if(d.error){ toast('❌ '+d.error,'error',5000); btn.disabled=false; btn.innerHTML='✅ Registrar entradas en bodega'; return; }
+
+    const msg = `✅ ${d.procesados} entrada${d.procesados!==1?'s':''} registrada${d.procesados!==1?'s':''} correctamente`;
+    toast(msg,'success',5000);
+    if(d.errores && d.errores.length){
+      setTimeout(()=>toast('⚠️ '+d.errores[0],'',5000),400);
+    }
+    setTimeout(()=>{ resetForm(); }, 2200);
+  } catch(e){
+    toast('Error de conexión','error');
+    btn.disabled=false;
+    btn.innerHTML='✅ Registrar entradas en bodega';
+  }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function resetForm(){
+  _meta={}; _rows=[]; _productos=[]; _cloudinary_url='';
+  document.getElementById('rows-tbody').innerHTML='';
+  document.getElementById('panel-upload').style.display='block';
+  document.getElementById('panel-result').style.display='none';
+  document.getElementById('pdf-input').value='';
+  document.getElementById('upload-status').textContent='';
+}
+
+function fmtCLP(n){
+  return '$' + parseInt(n).toLocaleString('es-CL');
+}
+
+function esc(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function toast(msg,tipo='',ms=3200){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show '+(tipo||'');
+  clearTimeout(t._to);
+  t._to=setTimeout(()=>t.classList.remove('show'),ms);
+}
+</script>
+</body>
+</html>
