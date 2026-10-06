@@ -2490,6 +2490,27 @@ def eliminar_guia_salida(gid):
     return jsonify({'ok': True})
 
 
+@app.route('/ver_pdf')
+@login_required
+def ver_pdf():
+    """Proxy para servir PDFs de Cloudinary evitando restricciones ACL del navegador."""
+    import urllib.request, urllib.error
+    url = request.args.get('url', '').strip()
+    if not url or 'cloudinary.com' not in url:
+        return 'URL inválida', 400
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resp:
+            pdf_bytes = resp.read()
+        return send_file(
+            io.BytesIO(pdf_bytes),
+            mimetype='application/pdf',
+            as_attachment=False,
+            download_name='documento.pdf'
+        )
+    except Exception as e:
+        return f'No se pudo obtener el PDF: {e}', 502
+
+
 if __name__=='__main__':
     init_db()
     app.run(debug=False,host='0.0.0.0',port=int(os.environ.get('PORT',5000)))
