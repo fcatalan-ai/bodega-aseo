@@ -1601,65 +1601,160 @@ def parsear_factura():
                     meta['proveedor'] = ln
                     break
 
-            # Totales desde texto
-            def parse_monto(pattern):
-                m2 = re.search(pattern, text, re.IGNORECASE)
-                if m2:
-                    v = m2.group(1).replace('.','').replace(',','').strip()
-                    try: return int(v)
-                    except: return 0
+            # ── Totales desde texto ──────────────────────────────────────────────
+            def parse_monto(patterns):
+                """Intenta múltiples patrones y retorna el primer match."""
+                if isinstance(patterns, str):
+                    patterns = [patterns]
+                for pat in patterns:
+                    m2 = re.search(pat, text, re.IGNORECASE)
+                    if m2:
+                        v = m2.group(1).replace('.','').replace(',','').strip()
+                        try: return int(float(v))
+                        except: pass
                 return 0
-            meta['neto']  = parse_monto(r'MONTO NETO\s*\$?\s*([\d.,]+)')
-            meta['iva']   = parse_monto(r'I\.?V\.?A\.?[^$\n]*\$?\s*([\d.,]+)')
-            meta['total'] = parse_monto(r'TOTAL\s*\$?\s*([\d.,]+)')
 
-            # Extraer productos: escaneo derecha-izquierda buscando 3 números al final
-            def extraer_numero_cl(tok):
-                cleaned = tok.replace('.', '').replace(',', '')
-                return int(cleaned) if cleaned.isdigit() else None
+            meta['neto']  = parse_monto([
+                r'MONTO NETO\s*[\$]?\s*([\d.,]+)',
+                r'(?<!\w)NETO\s*[\$]?\s*([\d.,]+)',
+            ])
+            meta['iva']   = parse_monto([
+                r'IVA\s*\(19%\)\s*[\$]?\s*([\d.,]+)',
+                r'IVA[^\n]{0,20}([\d.,]+)',
+            ])
+            # Total: buscar ÚLTIMA línea "Total XXX" para evitar capturar encabezado de columna
+            total_matches = list(re.finditer(r'^[Tt]otal\s*[\$]?\s*([\d.,]+)', text, re.MULTILINE))
+            if total_matches:
+                v = total_matches[-1].group(1).replace('.','').replace(',','').strip()
+                try: meta['total'] = int(float(v))
+                except: pass
+            if not meta['total']:
+                meta['total'] = parse_monto(r'TOTAL\s*[\$]?\s*([\d.,]+)')
 
-            SKIP_PROD_KW = [
-                'DESCRIPCION','DESCRIPCIÓN','CANTIDAD','PRECIO','VALOR','CODIGO','CÓDIGO',
-                'MONTO NETO','MONTO','I.V.A','IVA','TOTAL','FORMA DE PAGO','FORMA','TIMBRE',
-                'SEÑOR','SEÑORES','R.U.T','RUT','GIRO','DIRECC','COMUN','CIUDAD','TIPO',
-                'FACTURA','ELECTRONICA','ELECTRÓNICA','S.I.I','SII','IMPUESTO','ADICIONAL',
-                'COMERCIALIZADORA','CORPORACION','CORPORACIÓN','COLEGIO','VENTA','ARRIEROS',
-                'EMAIL','TELEFONO','TELÉFONO','PEDRO','RESOLUCION','RESOLUCIÓN','VERIFIQUE',
-                'FECHA','FOLIO','VENDEDOR','BODEGA','CONDICION','CONDICIÓN','NETO',
-                'SUBTOTAL','SUB TOTAL','DESCUENTO','% IMPTO','%IMPTO',
-            ]
+            # ── Extraer productos: Método 1 — tablas estructuradas (más preciso) ──
+            def cl_int(s):
+                """Parsea número chileno: 1.234 → 1234, 1.234,56 → 1234"""
+                if not s: return 0
+                s = str(s).strip()
+                # Formato CL: puntos como miles, coma como decimal → quitar puntos
+                s = s.replace('.', '').replace(',', '')
+                try: return int(float(s))
+                except: return 0
 
-            for ln in lines:
-                ln_s = ln.strip()
-                if ln_s.startswith('-'): ln_s = ln_s[1:].strip()
-                if not ln_s or len(ln_s) < 5: continue
-                if any(kw in ln_s.upper() for kw in SKIP_PROD_KW): continue
-                tokens = ln_s.split()
-                if len(tokens) < 4: continue
-                # Scan right-to-left collecting trailing integers
-                trailing = []; text_end = len(tokens)
-                for i in range(len(tokens) - 1, -1, -1):
-                    n = extraer_numero_cl(tokens[i])
-                    if n is not None:
-                        trailing.insert(0, n)
-                        text_end = i
-                        if len(trailing) == 3:
-                            break
-                    else:
-                        if trailing:
-                            break  # non-number interrupts sequence
-                if len(trailing) != 3:
+            SUMMARY_KW = {'NETO','IVA','TOTAL','IMPTO','IMPUESTO','DESCUENTO','SUBTOTAL','SUB TOTAL'}
+
+            tables = page.extract_tables()
+            for tbl in tables:
+                if not tbl or len(tbl) < 2:
                     continue
-                nombre = ' '.join(tokens[:text_end]).strip()
-                if len(nombre) < 3 or not any(c.isalpha() for c in nombre): continue
-                cant, precio, valor = trailing[0], trailing[1], trailing[2]
-                if cant <= 0 or cant > 9999 or valor <= 0: continue
-                rows_parsed.append({
-                    'nombre_factura': nombre,
-                    'cantidad': cant,
-                    'precio_unit': precio,
-                    'valor': valor,
-                })
+                header = [str(c or '').lower().strip() for c in tbl[0]]
+                # Detectar si es tabla de items (tiene columna cantidad/detalle/unitario)
+                has_cant  = any('cant' in h for h in header)
+                has_det   = any('det' in h or 'desc' in h for h in header)
+                has_unit  = any('unit' in h or 'prec' in h for h in header)
+                if not (has_cant or (has_det and has_unit)):
+                    continue
+                cant_col  = next((i for i,h in enumerate(header) if 'cant' in h), 0)
+                det_col   = next((i for i,h in enumerate(header) if 'det' in h or 'desc' in h), 1)
+                unit_col  = next((i for i,h in enumerate(header) if 'unit' in h or 'prec' in h), 2)
+                total_col = next((i for i,h in enumerate(header) if 'total' in h or 'valor' in h), len(tbl[0])-1)
+
+                for row in tbl[1:]:
+                    if not row or len(row) <= max(cant_col, det_col):
+                        continue
+                    cant_raw  = str(row[cant_col]  or '').strip()
+                    det_raw   = str(row[det_col]   or '').strip()
+                    unit_raw  = str(row[unit_col]  or '').strip() if len(row) > unit_col else ''
+                    total_raw = str(row[total_col] or '').strip() if len(row) > total_col else ''
+
+                    # Saltar filas de resumen (Neto, IVA, Total…)
+                    if not cant_raw and any(k in det_raw.upper() for k in SUMMARY_KW):
+                        continue
+                    if any(k in cant_raw.upper() for k in SUMMARY_KW):
+                        continue
+
+                    # La cantidad puede venir mezclada con texto: "8.00 BIDO" → cant=8, extra="BIDO"
+                    m_cant = re.match(r'^([\d.,]+)\s*(.*)', cant_raw)
+                    if not m_cant:
+                        continue
+                    try:
+                        raw_num = m_cant.group(1)
+                        # "8.00"/"3.50" → decimal → int(8); "1.500" → miles CL → 1500
+                        m_dec = re.match(r'^(\d+)[.,](\d{1,2})$', raw_num)
+                        if m_dec:
+                            cant_val = int(m_dec.group(1))
+                        else:
+                            cant_val = int(float(raw_num.replace('.','').replace(',','.')))
+                    except:
+                        continue
+                    if cant_val <= 0 or cant_val > 9999:
+                        continue
+
+                    # Nombre = texto extra de cant_col + detalle
+                    extra = m_cant.group(2).strip()
+                    nombre = (f'{extra} {det_raw}'.strip() if extra else det_raw).strip()
+                    if not nombre or len(nombre) < 2 or not any(c.isalpha() for c in nombre):
+                        continue
+                    if any(k in nombre.upper() for k in SUMMARY_KW):
+                        continue
+
+                    precio = cl_int(unit_raw)
+                    valor  = cl_int(total_raw)
+                    if valor <= 0 and precio > 0:
+                        valor = precio * cant_val
+
+                    rows_parsed.append({
+                        'nombre_factura': nombre,
+                        'cantidad': cant_val,
+                        'precio_unit': precio,
+                        'valor': valor,
+                    })
+
+                if rows_parsed:
+                    break  # tabla encontrada, no seguir buscando
+
+            # ── Método 2: escaneo línea a línea (fallback si tablas no dieron resultado) ──
+            if not rows_parsed:
+                def extraer_numero_cl(tok):
+                    cleaned = tok.replace('.', '').replace(',', '')
+                    return int(cleaned) if cleaned.isdigit() else None
+
+                SKIP_PROD_KW = [
+                    'DESCRIPCION','DESCRIPCIÓN','CANTIDAD','PRECIO','VALOR','CODIGO','CÓDIGO',
+                    'MONTO NETO','MONTO','I.V.A','IVA','TOTAL','FORMA DE PAGO','FORMA','TIMBRE',
+                    'SEÑOR','SEÑORES','R.U.T','RUT','GIRO','DIRECC','COMUN','CIUDAD','TIPO',
+                    'FACTURA','ELECTRONICA','ELECTRÓNICA','S.I.I','SII','IMPUESTO','ADICIONAL',
+                    'COMERCIALIZADORA','CORPORACION','CORPORACIÓN','COLEGIO','VENTA','ARRIEROS',
+                    'EMAIL','TELEFONO','TELÉFONO','PEDRO','RESOLUCION','RESOLUCIÓN','VERIFIQUE',
+                    'FECHA','FOLIO','VENDEDOR','BODEGA','CONDICION','CONDICIÓN','NETO',
+                    'SUBTOTAL','SUB TOTAL','DESCUENTO','% IMPTO','%IMPTO',
+                ]
+                for ln in lines:
+                    ln_s = ln.strip()
+                    if ln_s.startswith('-'): ln_s = ln_s[1:].strip()
+                    if not ln_s or len(ln_s) < 5: continue
+                    if any(kw in ln_s.upper() for kw in SKIP_PROD_KW): continue
+                    tokens = ln_s.split()
+                    if len(tokens) < 4: continue
+                    trailing = []; text_end = len(tokens)
+                    for i in range(len(tokens) - 1, -1, -1):
+                        n = extraer_numero_cl(tokens[i])
+                        if n is not None:
+                            trailing.insert(0, n); text_end = i
+                            if len(trailing) == 3: break
+                        else:
+                            if trailing: break
+                    if len(trailing) != 3: continue
+                    nombre = ' '.join(tokens[:text_end]).strip()
+                    if len(nombre) < 3 or not any(c.isalpha() for c in nombre): continue
+                    cant, precio, valor = trailing[0], trailing[1], trailing[2]
+                    if cant <= 0 or cant > 9999 or valor <= 0: continue
+                    rows_parsed.append({
+                        'nombre_factura': nombre,
+                        'cantidad': cant,
+                        'precio_unit': precio,
+                        'valor': valor,
+                    })
 
         # Obtener productos de bodega para matching
         productos = db_fetchall(
