@@ -45,9 +45,21 @@ td{padding:8px 10px;vertical-align:middle;border-bottom:1px solid #f0f0f0}
 .badge-ok{background:#E2EFDA;color:#27500A}
 .badge-warn{background:#FFF2CC;color:#7a5c00}
 .badge-no{background:#FCEBEB;color:#791F1F}
-select.prod-sel{width:100%;padding:5px 8px;border:1.5px solid #ddd;border-radius:7px;font-size:12px;background:#fff}
-select.prod-sel:focus{outline:none;border-color:#0D4F3C}
 input.new-name{width:100%;padding:5px 8px;border:1.5px solid #FFC107;border-radius:7px;font-size:12px;background:#FFFDE7}
+/* AUTOCOMPLETE */
+.ac-wrap{position:relative;display:inline-block;width:100%;min-width:160px}
+.ac-input{background:#fff;border:1.5px solid #ddd;color:#1a1a1a;border-radius:7px;padding:5px 26px 5px 8px;font-size:12px;width:100%;outline:none;cursor:text}
+.ac-input:focus{border-color:#0D4F3C}
+.ac-input.unassigned{border-color:#ddd;color:#999}
+.ac-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:#999;cursor:pointer;font-size:.8rem;padding:0;line-height:1;display:none}
+.ac-clear:hover{color:#c0392b}
+.ac-wrap.has-val .ac-clear{display:block}
+.ac-dropdown{position:absolute;top:calc(100% + 3px);left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:8px;z-index:999;max-height:190px;overflow-y:auto;box-shadow:0 6px 18px rgba(0,0,0,.12);display:none}
+.ac-dropdown.open{display:block}
+.ac-option{padding:6px 10px;cursor:pointer;font-size:12px;color:#1a1a1a;border-bottom:1px solid #f0f0f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-option:last-child{border-bottom:none}
+.ac-option:hover,.ac-option.focused{background:#e3efe8;color:#0D4F3C}
+.ac-none{padding:7px 10px;color:#888;font-size:12px;font-style:italic}
 td.cant-cell{font-weight:700;color:#0D4F3C;text-align:center}
 td.precio-cell,td.total-cell{text-align:right;color:#555;font-size:12px}
 /* Buttons */
@@ -265,13 +277,9 @@ function mostrarResultado(){
     const badgeCls = score >= 0.85 ? 'badge-ok' : score >= 0.3 ? 'badge-warn' : 'badge-no';
     const badgeTxt = score >= 0.85 ? '✅ Coincide' : score >= 0.3 ? '⚠️ Parcial' : '❌ Sin match';
 
-    // Build producto select options
-    let opts = '<option value="">— Sin asignar —</option>'
-             + '<option value="_nuevo_">➕ Crear como nuevo producto</option>';
-    _productos.forEach(p => {
-      const sel = (p.id === row.producto_id) ? 'selected' : '';
-      opts += `<option value="${p.id}" ${sel}>${p.nombre} (${p.unidad})</option>`;
-    });
+    const matchedNombre = row.producto_id
+      ? (_productos.find(p => p.id === row.producto_id) || {}).nombre || ''
+      : '';
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -280,11 +288,19 @@ function mostrarResultado(){
         <span class="badge-match ${badgeCls}" style="margin-top:4px">${badgeTxt}</span>
       </td>
       <td data-label="Producto bodega">
-        <select class="prod-sel" id="sel-${i}" onchange="onSelChange(${i},this)">
-          ${opts}
-        </select>
-        <input class="new-name" id="new-${i}" placeholder="Nombre del nuevo producto..."
-               style="display:none;margin-top:4px">
+        <div class="ac-wrap${matchedNombre ? ' has-val' : ''}" id="acwrap-${i}">
+          <input class="ac-input${matchedNombre ? '' : ' unassigned'}" id="ac-input-${i}"
+                 type="text" autocomplete="off" spellcheck="false"
+                 placeholder="— Sin asignar —"
+                 value="${esc(matchedNombre)}"
+                 oninput="acFilter(${i})"
+                 onfocus="acOpen(${i})"
+                 onblur="acBlur(${i})"
+                 onkeydown="acKey(event,${i})">
+          <button class="ac-clear" onclick="acClear(${i})" tabindex="-1" title="Quitar">✕</button>
+          <div class="ac-dropdown" id="ac-drop-${i}"></div>
+        </div>
+        <input type="hidden" id="prod-${i}" value="${row.producto_id || ''}">
       </td>
       <td class="cant-cell" data-label="Cant.">${row.cantidad}</td>
       <td class="precio-cell" data-label="Precio unit.">${row.precio_unit ? fmtCLP(row.precio_unit) : '—'}</td>
@@ -297,25 +313,122 @@ function mostrarResultado(){
   document.getElementById('panel-result').style.display = 'block';
 }
 
-function onSelChange(i, sel){
-  const isNuevo = sel.value === '_nuevo_';
-  document.getElementById(`new-${i}`).style.display = isNuevo ? 'block' : 'none';
-  _rows[i].producto_id = isNuevo ? null : (sel.value ? parseInt(sel.value) : null);
+// ── AUTOCOMPLETE ─────────────────────────────────────────────────────────────
+let _acFocused = {};
+
+function _normalizeAC(s){
+  return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+}
+
+function acBuildDropdown(i, query){
+  const drop = document.getElementById(`ac-drop-${i}`);
+  const q = _normalizeAC(query);
+  const matches = _productos.filter(p => _normalizeAC(p.nombre).includes(q));
+  _acFocused[i] = -1;
+  let html = '';
+  if(!matches.length && q){
+    html = `<div class="ac-none">Sin resultados para "<b>${query}</b>"</div>`;
+  } else {
+    html = matches.map((p, mi) =>
+      `<div class="ac-option" data-id="${p.id}" data-nombre="${p.nombre.replace(/"/g,'&quot;')}" data-mi="${mi}"
+            onmousedown="acSelect(event,${i})"
+            onmouseover="acHover(${i},${mi})">${p.nombre}</div>`
+    ).join('');
+  }
+  drop.innerHTML = html;
+  drop.classList.add('open');
+}
+
+function acOpen(i){
+  const inp = document.getElementById(`ac-input-${i}`);
+  acBuildDropdown(i, inp.value);
+}
+
+function acFilter(i){
+  const inp  = document.getElementById(`ac-input-${i}`);
+  const hid  = document.getElementById(`prod-${i}`);
+  const wrap = document.getElementById(`acwrap-${i}`);
+  hid.value = '';
+  wrap.classList.remove('has-val');
+  inp.classList.add('unassigned');
+  _rows[i].producto_id = null;
+  acBuildDropdown(i, inp.value);
+}
+
+function acHover(i, mi){
+  _acFocused[i] = mi;
+  document.querySelectorAll(`#ac-drop-${i} .ac-option`).forEach((el,j) =>
+    el.classList.toggle('focused', j === mi));
+}
+
+function acSelect(e, i){
+  e.preventDefault();
+  const opt   = e.currentTarget;
+  const pid   = parseInt(opt.dataset.id);
+  const nombre = opt.dataset.nombre;
+  document.getElementById(`prod-${i}`).value = pid;
+  const inp = document.getElementById(`ac-input-${i}`);
+  inp.value = nombre;
+  inp.classList.remove('unassigned');
+  document.getElementById(`acwrap-${i}`).classList.add('has-val');
+  document.getElementById(`ac-drop-${i}`).classList.remove('open');
+  _rows[i].producto_id = pid;
+}
+
+function acClear(i){
+  document.getElementById(`prod-${i}`).value = '';
+  const inp = document.getElementById(`ac-input-${i}`);
+  inp.value = '';
+  inp.classList.add('unassigned');
+  document.getElementById(`acwrap-${i}`).classList.remove('has-val');
+  document.getElementById(`ac-drop-${i}`).classList.remove('open');
+  _rows[i].producto_id = null;
+  inp.focus();
+}
+
+function acBlur(i){
+  setTimeout(() => {
+    const drop = document.getElementById(`ac-drop-${i}`);
+    if(drop) drop.classList.remove('open');
+    // Si no hay selección válida, limpiar texto
+    const hid = document.getElementById(`prod-${i}`);
+    const inp = document.getElementById(`ac-input-${i}`);
+    if(!hid.value && inp && inp.value.trim()){
+      inp.value = '';
+      inp.classList.add('unassigned');
+      document.getElementById(`acwrap-${i}`).classList.remove('has-val');
+      _rows[i].producto_id = null;
+    }
+  }, 150);
+}
+
+function acKey(e, i){
+  const drop = document.getElementById(`ac-drop-${i}`);
+  const opts = drop ? drop.querySelectorAll('.ac-option') : [];
+  if(e.key === 'ArrowDown'){
+    e.preventDefault();
+    _acFocused[i] = Math.min((_acFocused[i]||0)+1, opts.length-1);
+    opts.forEach((el,j) => el.classList.toggle('focused', j===_acFocused[i]));
+  } else if(e.key === 'ArrowUp'){
+    e.preventDefault();
+    _acFocused[i] = Math.max((_acFocused[i]||0)-1, 0);
+    opts.forEach((el,j) => el.classList.toggle('focused', j===_acFocused[i]));
+  } else if(e.key === 'Enter'){
+    e.preventDefault();
+    const focused = _acFocused[i] >= 0 ? opts[_acFocused[i]] : opts[0];
+    if(focused) focused.dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
+  } else if(e.key === 'Escape'){
+    if(drop) drop.classList.remove('open');
+  }
 }
 
 // ── Procesar ─────────────────────────────────────────────────────────────────
 async function procesar(){
-  // Leer estado actual de selects
+  // Leer estado actual del autocomplete
   _rows.forEach((row, i) => {
-    const sel = document.getElementById(`sel-${i}`);
-    if(!sel) return;
-    if(sel.value === '_nuevo_'){
-      row.producto_id  = null;
-      row.nombre_nuevo = (document.getElementById(`new-${i}`).value || '').trim();
-    } else {
-      row.producto_id  = sel.value ? parseInt(sel.value) : null;
-      row.nombre_nuevo = '';
-    }
+    const hid = document.getElementById(`prod-${i}`);
+    row.producto_id  = hid && hid.value ? parseInt(hid.value) : null;
+    row.nombre_nuevo = '';
   });
 
   const activos = _rows.filter(r => r.producto_id || r.nombre_nuevo);
