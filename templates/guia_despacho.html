@@ -143,6 +143,9 @@ td.precio-cell,td.total-cell{text-align:right;color:#555;font-size:12px}
       </div>
     </div>
 
+    <!-- Banner duplicado -->
+    <div id="dup-banner" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:14px;color:#856404;font-size:.9rem;line-height:1.5;"></div>
+
     <!-- Datos guía -->
     <div class="card">
       <div class="card-title">📋 Datos de la Guía</div>
@@ -243,6 +246,16 @@ function handleFile(file){
       _rows    = d.rows    || [];
       _productos = d.productos || [];
       _cloudinary_url = d.cloudinary_url || '';
+      // Alerta de duplicado
+      const dupBanner = document.getElementById('dup-banner');
+      if(d.duplicado && d.dup_info){
+        const di = d.dup_info;
+        dupBanner.innerHTML = `⚠️ <strong>Documento ya cargado.</strong> Esta guía de despacho (N° ${_meta.numero}) fue importada el <strong>${di.fecha}</strong> por <strong>${di.usuario}</strong> (${di.proveedor}). Puedes continuar igual si deseas registrarla nuevamente.`;
+        dupBanner.style.display = 'block';
+      } else {
+        dupBanner.style.display = 'none';
+        dupBanner.innerHTML = '';
+      }
       mostrarResultado();
     })
     .catch(() => { st.textContent=''; toast('Error de conexión','error'); });
