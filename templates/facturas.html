@@ -204,6 +204,8 @@ tr.fila-skip input,tr.fila-skip .ac-input{pointer-events:none}
 
   <!-- ZONA 2: PREVIEW -->
   <div id="zone-preview">
+    <!-- Banner duplicado -->
+    <div id="dup-banner" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:14px;color:#856404;font-size:.9rem;line-height:1.5;"></div>
     <!-- Meta -->
     <div class="meta-grid" id="meta-grid"></div>
 
@@ -328,6 +330,16 @@ async function procesarArchivo(file) {
     if (!r.ok || data.error) { mostrarError(data.error || 'Error al parsear'); dropZone.style.display = 'block'; return; }
     parsedData = data;
     productosDB = data.productos;
+    // Alerta de duplicado
+    const dupBanner = document.getElementById('dup-banner');
+    if (data.duplicado && data.dup_info) {
+      const di = data.dup_info;
+      dupBanner.innerHTML = `⚠️ <strong>Documento ya cargado.</strong> Esta factura (N° ${data.meta.numero}) fue importada el <strong>${di.fecha}</strong> por <strong>${di.usuario}</strong> (${di.proveedor}). Puedes continuar igual si deseas registrarla nuevamente.`;
+      dupBanner.style.display = 'block';
+    } else {
+      dupBanner.style.display = 'none';
+      dupBanner.innerHTML = '';
+    }
     renderPreview(data);
   } catch(e) {
     document.getElementById('loading-parseo').style.display = 'none';
