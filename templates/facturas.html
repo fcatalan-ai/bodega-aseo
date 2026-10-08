@@ -165,6 +165,7 @@ tr.fila-skip input,tr.fila-skip .ac-input{pointer-events:none}
     {% if rol == 'admin' %}<a href="/facturas" class="active">🧾 Facturas</a>{% endif %}
     <a href="/guia">📄 Guía Salida</a>
     {% if rol in ('admin','operador') %}<a href="/guia_entrada">📥 Guía Entrada</a>{% endif %}
+    {% if rol in ('admin','operador') %}<a href="/guia_despacho">🚚 G. Despacho</a>{% endif %}
   </div>
   <div class="topbar-right">
     <span class="user-pill">👤 {{ user }}</span>
