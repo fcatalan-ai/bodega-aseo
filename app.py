@@ -1794,8 +1794,27 @@ def parsear_factura():
                 row['producto_nombre'] = ''
                 row['match_score'] = 0.0
 
+        # ── Detección de documento duplicado ────────────────────────────────────
+        duplicado = False
+        dup_info  = {}
+        if meta.get('numero'):
+            num_dup = meta['numero']
+            # Buscar en guias_entrada por folio (patrón F-{numero}-...)
+            existing = db_fetchone(
+                "SELECT guia_id, fecha, proveedor, usuario FROM guias_entrada WHERE guia_id LIKE ? LIMIT 1",
+                (f"F-{num_dup}-%",))
+            if existing:
+                duplicado = True
+                dup_info = {
+                    'guia_id':   existing.get('guia_id', ''),
+                    'fecha':     existing.get('fecha', ''),
+                    'proveedor': existing.get('proveedor', ''),
+                    'usuario':   existing.get('usuario', ''),
+                }
+
         return jsonify({'ok': True, 'meta': meta, 'rows': rows_parsed, 'productos': productos,
-                        'cloudinary_url': cloudinary_url_result})
+                        'cloudinary_url': cloudinary_url_result,
+                        'duplicado': duplicado, 'dup_info': dup_info})
     except Exception as e:
         import traceback
         return jsonify({'error': str(e), 'detalle': traceback.format_exc()}), 500
@@ -2117,8 +2136,27 @@ def parsear_guia_despacho():
                 row['producto_nombre'] = ''
                 row['match_score']     = 0.0
 
+        # ── Detección de documento duplicado ────────────────────────────────────
+        duplicado = False
+        dup_info  = {}
+        if meta.get('numero'):
+            num_dup = meta['numero']
+            # Buscar en guias_entrada por folio (patrón GD-{numero}-...)
+            existing = db_fetchone(
+                "SELECT guia_id, fecha, proveedor, usuario FROM guias_entrada WHERE guia_id LIKE ? LIMIT 1",
+                (f"GD-{num_dup}-%",))
+            if existing:
+                duplicado = True
+                dup_info = {
+                    'guia_id':   existing.get('guia_id', ''),
+                    'fecha':     existing.get('fecha', ''),
+                    'proveedor': existing.get('proveedor', ''),
+                    'usuario':   existing.get('usuario', ''),
+                }
+
         return jsonify({'ok': True, 'meta': meta, 'rows': rows_parsed,
-                        'productos': productos, 'cloudinary_url': cloudinary_url_result})
+                        'productos': productos, 'cloudinary_url': cloudinary_url_result,
+                        'duplicado': duplicado, 'dup_info': dup_info})
     except Exception as e:
         import traceback
         return jsonify({'error': str(e), 'detalle': traceback.format_exc()}), 500
