@@ -1667,48 +1667,60 @@ def parsear_factura():
                     unit_raw  = str(row[unit_col]  or '').strip() if len(row) > unit_col else ''
                     total_raw = str(row[total_col] or '').strip() if len(row) > total_col else ''
 
-                    # Saltar filas de resumen (Neto, IVA, Total…)
-                    if not cant_raw and any(k in det_raw.upper() for k in SUMMARY_KW):
-                        continue
-                    if any(k in cant_raw.upper() for k in SUMMARY_KW):
-                        continue
+                    # ── Detectar celdas multi-línea (pdfplumber fusiona filas con \n) ──
+                    # Ej: cant_raw = "6.00 BIDO\n6.00 BIDO\n6.00 BIDO"
+                    #     det_raw  = "JABON LIQUIDO X 5 LT\nALCOHOL GEL 70 X 5 LT\nALCOHOL DESNATURALIZA 70"
+                    cant_lines  = cant_raw.split('\n')
+                    det_lines   = det_raw.split('\n')
+                    unit_lines  = unit_raw.split('\n')
+                    total_lines = total_raw.split('\n')
+                    n_sub = max(len(cant_lines), len(det_lines))
 
-                    # La cantidad puede venir mezclada con texto: "8.00 BIDO" → cant=8, extra="BIDO"
-                    m_cant = re.match(r'^([\d.,]+)\s*(.*)', cant_raw)
-                    if not m_cant:
-                        continue
-                    try:
-                        raw_num = m_cant.group(1)
-                        # "8.00"/"3.50" → decimal → int(8); "1.500" → miles CL → 1500
-                        m_dec = re.match(r'^(\d+)[.,](\d{1,2})$', raw_num)
-                        if m_dec:
-                            cant_val = int(m_dec.group(1))
-                        else:
-                            cant_val = int(float(raw_num.replace('.','').replace(',','.')))
-                    except:
-                        continue
-                    if cant_val <= 0 or cant_val > 9999:
-                        continue
+                    def _parse_sub(sc, sd, su, st):
+                        """Parsea una sub-fila (puede venir de celda multi-línea)."""
+                        sc = sc.strip(); sd = sd.strip()
+                        su = su.strip(); st = st.strip()
+                        # Saltar filas de resumen
+                        if not sc and any(k in sd.upper() for k in SUMMARY_KW):
+                            return None
+                        if any(k in sc.upper() for k in SUMMARY_KW):
+                            return None
+                        # Parsear cantidad
+                        m_c = re.match(r'^([\d.,]+)\s*(.*)', sc)
+                        if not m_c:
+                            return None
+                        try:
+                            raw_num = m_c.group(1)
+                            m_dec = re.match(r'^(\d+)[.,](\d{1,2})$', raw_num)
+                            if m_dec:
+                                cv = int(m_dec.group(1))
+                            else:
+                                cv = int(float(raw_num.replace('.','').replace(',','.')))
+                        except:
+                            return None
+                        if cv <= 0 or cv > 9999:
+                            return None
+                        extra = m_c.group(2).strip()
+                        nombre = (f'{extra} {sd}'.strip() if extra else sd).strip()
+                        if not nombre or len(nombre) < 2 or not any(c.isalpha() for c in nombre):
+                            return None
+                        if any(k in nombre.upper() for k in SUMMARY_KW):
+                            return None
+                        precio = cl_int(su)
+                        valor  = cl_int(st)
+                        if valor <= 0 and precio > 0:
+                            valor = precio * cv
+                        return {'nombre_factura': nombre, 'cantidad': cv,
+                                'precio_unit': precio, 'valor': valor}
 
-                    # Nombre = texto extra de cant_col + detalle
-                    extra = m_cant.group(2).strip()
-                    nombre = (f'{extra} {det_raw}'.strip() if extra else det_raw).strip()
-                    if not nombre or len(nombre) < 2 or not any(c.isalpha() for c in nombre):
-                        continue
-                    if any(k in nombre.upper() for k in SUMMARY_KW):
-                        continue
-
-                    precio = cl_int(unit_raw)
-                    valor  = cl_int(total_raw)
-                    if valor <= 0 and precio > 0:
-                        valor = precio * cant_val
-
-                    rows_parsed.append({
-                        'nombre_factura': nombre,
-                        'cantidad': cant_val,
-                        'precio_unit': precio,
-                        'valor': valor,
-                    })
+                    for si in range(n_sub):
+                        sc = cant_lines[si]  if si < len(cant_lines)  else ''
+                        sd = det_lines[si]   if si < len(det_lines)   else ''
+                        su = unit_lines[si]  if si < len(unit_lines)  else ''
+                        st = total_lines[si] if si < len(total_lines) else ''
+                        parsed = _parse_sub(sc, sd, su, st)
+                        if parsed:
+                            rows_parsed.append(parsed)
 
                 if rows_parsed:
                     break  # tabla encontrada, no seguir buscando
