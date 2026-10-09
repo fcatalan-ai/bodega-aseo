@@ -1772,12 +1772,24 @@ def parsear_factura():
         productos = db_fetchall(
             "SELECT id, nombre, categoria, unidad FROM productos WHERE activo=TRUE ORDER BY nombre")
 
+        UNIT_WORDS = {'lt','lts','kg','kgs','ml','gr','grs','un','und','unid','uni',
+                      'liq','gel','sol','pza','cja','caja','rollo','bolsa','saco',
+                      'frasco','tarro','galon','litro','kilo','pieza','pack','x'}
+
         def normalizar(s):
-            import unicodedata
+            import unicodedata, re as _re
             s = s.lower().strip()
             s = unicodedata.normalize('NFD', s)
             s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+            # Pegar número+unidad para normalizar "5 lt" y "5lt" al mismo token
+            s = _re.sub(r'(\d+)\s*(lt|lts|kg|kgs|ml|gr|un|und|unid|liq|gel)s?\b', r'\1\2', s)
             return s
+
+        def palabras_clave(s):
+            """Palabras significativas: quita números solos y abreviaturas de unidad."""
+            import re as _re
+            words = s.split()
+            return {w for w in words if not _re.match(r'^\d+$', w) and w not in UNIT_WORDS}
 
         for row in rows_parsed:
             nf = normalizar(row['nombre_factura'])
@@ -1790,14 +1802,20 @@ def parsear_factura():
                 elif nf in np or np in nf:
                     score = 0.85
                 else:
-                    wf = set(nf.split())
-                    wp = set(np.split())
-                    overlap = len(wf & wp)
-                    score = (overlap / max(len(wf), len(wp))) * 0.7 if overlap else 0
+                    # Comparar palabras clave (sin números sueltos ni abreviaturas)
+                    wf = palabras_clave(nf)
+                    wp = palabras_clave(np)
+                    if wf and wp:
+                        overlap = len(wf & wp)
+                        score = (overlap / max(len(wf), len(wp))) * 0.7 if overlap else 0
+                    else:
+                        wf2 = set(nf.split()); wp2 = set(np.split())
+                        overlap = len(wf2 & wp2)
+                        score = (overlap / max(len(wf2), len(wp2))) * 0.7 if overlap else 0
                 if score > best_score:
                     best_score = score
                     best_match = p
-            if best_match and best_score >= 0.3:
+            if best_match and best_score >= 0.25:
                 row['producto_id'] = best_match['id']
                 row['producto_nombre'] = best_match['nombre']
                 row['match_score'] = round(best_score, 2)
@@ -2114,12 +2132,22 @@ def parsear_guia_despacho():
         productos = db_fetchall(
             "SELECT id, nombre, categoria, unidad FROM productos WHERE activo=TRUE ORDER BY nombre")
 
+        _UNIT_WORDS = {'lt','lts','kg','kgs','ml','gr','grs','un','und','unid','uni',
+                       'liq','gel','sol','pza','cja','caja','rollo','bolsa','saco',
+                       'frasco','tarro','galon','litro','kilo','pieza','pack','x'}
+
         def normalizar(s):
-            import unicodedata
+            import unicodedata, re as _re
             s = s.lower().strip()
             s = unicodedata.normalize('NFD', s)
             s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
+            s = _re.sub(r'(\d+)\s*(lt|lts|kg|kgs|ml|gr|un|und|unid|liq|gel)s?\b', r'\1\2', s)
             return s
+
+        def palabras_clave(s):
+            import re as _re
+            words = s.split()
+            return {w for w in words if not _re.match(r'^\d+$', w) and w not in _UNIT_WORDS}
 
         for row in rows_parsed:
             nf = normalizar(row['nombre_factura'])
@@ -2132,14 +2160,19 @@ def parsear_guia_despacho():
                 elif nf in np or np in nf:
                     score = 0.85
                 else:
-                    wf = set(nf.split())
-                    wp = set(np.split())
-                    overlap = len(wf & wp)
-                    score = (overlap / max(len(wf), len(wp))) * 0.7 if overlap else 0
+                    wf = palabras_clave(nf)
+                    wp = palabras_clave(np)
+                    if wf and wp:
+                        overlap = len(wf & wp)
+                        score = (overlap / max(len(wf), len(wp))) * 0.7 if overlap else 0
+                    else:
+                        wf2 = set(nf.split()); wp2 = set(np.split())
+                        overlap = len(wf2 & wp2)
+                        score = (overlap / max(len(wf2), len(wp2))) * 0.7 if overlap else 0
                 if score > best_score:
                     best_score = score
                     best_match = p
-            if best_match and best_score >= 0.3:
+            if best_match and best_score >= 0.25:
                 row['producto_id']     = best_match['id']
                 row['producto_nombre'] = best_match['nombre']
                 row['match_score']     = round(best_score, 2)
