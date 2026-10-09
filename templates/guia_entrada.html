@@ -293,6 +293,10 @@ let filaIdx = 0;
 let filaState = {};
 // índice de fila para modal de crear producto
 let modalTargetIdx = null;
+// Cache de guías cargadas para el modal de edición
+let _guiasCache = {};
+// Helper: escapar HTML para atributos
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
 // ── Inicialización ────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -609,6 +613,9 @@ async function cargarHistorial() {
       cont.innerHTML = '<p class="hist-empty">No hay entradas registradas aún.</p>';
       return;
     }
+    // Guardar en cache para el modal de edición
+    _guiasCache = {};
+    data.forEach(g => { _guiasCache[g.id] = g; });
     cont.innerHTML = data.map(g => renderGuiaCard(g)).join('');
   } catch(e) {
     cont.innerHTML = '<p class="hist-empty" style="color:#e57373">Error cargando historial</p>';
@@ -702,20 +709,31 @@ let _editRows = [];
 let _editProds = [];
 
 async function abrirEditar(gid, e) {
-  e.stopPropagation();
-  // Cargar datos de la guia
-  const r = await fetch('/api/guias_entrada');
-  const d = await r.json();
-  const guia = (d.guias || d || []).find(g => g.id === gid);
+  if (e) e.stopPropagation();
+  // Usar cache del historial; si no está, hacer fetch
+  let guia = _guiasCache[gid];
+  if (!guia) {
+    try {
+      const r = await fetch('/api/guias_entrada');
+      const data = await r.json();
+      _guiasCache = {};
+      data.forEach(g => { _guiasCache[g.id] = g; });
+      guia = _guiasCache[gid];
+    } catch(err) { showToast('Error cargando datos', true); return; }
+  }
   if (!guia) { showToast('No se encontró el registro', true); return; }
-  _editId   = gid;
-  _editRows = JSON.parse(JSON.stringify(guia.items || []));
+
+  _editId    = gid;
+  // items puede venir como array (ya parseado) o necesitar parseo
+  let items = guia.items || [];
+  if (typeof items === 'string') { try { items = JSON.parse(items); } catch(_) { items = []; } }
+  _editRows  = JSON.parse(JSON.stringify(items));
   _editProds = productosDB.slice();
 
   // Rellenar meta
-  document.getElementById('edit-proveedor').value  = guia.proveedor || '';
-  document.getElementById('edit-fecha').value      = fechaIso(guia.fecha || '');
-  document.getElementById('edit-obs').value        = guia.observacion || '';
+  document.getElementById('edit-proveedor').value = guia.proveedor || '';
+  document.getElementById('edit-fecha').value     = fechaIso(guia.fecha || '');
+  document.getElementById('edit-obs').value       = guia.observacion || '';
 
   renderEditRows();
   document.getElementById('edit-modal-bg').classList.add('open');
