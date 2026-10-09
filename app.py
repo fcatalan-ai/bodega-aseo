@@ -2450,6 +2450,89 @@ def delete_guia_entrada(gid):
     return jsonify({'ok': True})
 
 
+@app.route('/api/guias_entrada/<int:gid>', methods=['PUT'])
+@admin_required
+def editar_guia_entrada(gid):
+    """Edita una guia de entrada: actualiza items_json, meta y ajusta stock diferencial."""
+    import json as _json
+    d = request.json or {}
+    guia = db_fetchone(
+        "SELECT id, items_json, proveedor, fecha, observacion FROM guias_entrada WHERE id=?",
+        (gid,))
+    if not guia:
+        return jsonify({'error': 'No encontrada'}), 404
+
+    # Items anteriores y nuevos
+    try:
+        old_items = _json.loads(guia.get('items_json') or '[]')
+    except Exception:
+        old_items = []
+    new_items = d.get('items', [])
+
+    # Calcular diff de stock por producto
+    def agrupar(items):
+        agg = {}
+        for it in items:
+            pid  = it.get('producto_id')
+            cant = int(it.get('cantidad', 0))
+            if pid and cant > 0:
+                agg[int(pid)] = agg.get(int(pid), 0) + cant
+        return agg
+
+    old_agg = agrupar(old_items)
+    new_agg = agrupar(new_items)
+
+    # Unión de pids afectados
+    all_pids = set(old_agg) | set(new_agg)
+
+    conn2, mode2 = get_db()
+    cur2 = conn2.cursor()
+    try:
+        for pid in all_pids:
+            delta = new_agg.get(pid, 0) - old_agg.get(pid, 0)
+            if delta == 0:
+                continue
+            if mode2 == 'pg':
+                if delta > 0:
+                    cur2.execute("UPDATE productos SET stock_actual=stock_actual+%s WHERE id=%s", (delta, pid))
+                else:
+                    cur2.execute("UPDATE productos SET stock_actual=GREATEST(0,stock_actual+%s) WHERE id=%s", (delta, pid))
+            else:
+                if delta > 0:
+                    cur2.execute("UPDATE productos SET stock_actual=stock_actual+? WHERE id=?", (delta, pid))
+                else:
+                    cur2.execute("UPDATE productos SET stock_actual=MAX(0,stock_actual+?) WHERE id=?", (delta, pid))
+
+        # Recalcular totales desde los nuevos items
+        total_neto = d.get('total_neto') or sum(
+            int(it.get('valor', 0) or it.get('cantidad',0)*it.get('precio_unit',0)) for it in new_items)
+        total_iva  = d.get('total_iva', 0) or 0
+        total_tot  = d.get('total', 0) or (total_neto + total_iva)
+
+        new_items_json = _json.dumps(new_items, ensure_ascii=False)
+        nuevo_proveedor = d.get('proveedor', guia.get('proveedor', ''))
+        nueva_fecha     = d.get('fecha', guia.get('fecha', ''))
+        nueva_obs       = d.get('observacion', guia.get('observacion', ''))
+
+        if mode2 == 'pg':
+            cur2.execute(
+                "UPDATE guias_entrada SET items_json=%s, proveedor=%s, fecha=%s, observacion=%s, "
+                "total_neto=%s, total_iva=%s, total=%s WHERE id=%s",
+                (new_items_json, nuevo_proveedor, nueva_fecha, nueva_obs,
+                 total_neto, total_iva, total_tot, gid))
+        else:
+            cur2.execute(
+                "UPDATE guias_entrada SET items_json=?, proveedor=?, fecha=?, observacion=?, "
+                "total_neto=?, total_iva=?, total=? WHERE id=?",
+                (new_items_json, nuevo_proveedor, nueva_fecha, nueva_obs,
+                 total_neto, total_iva, total_tot, gid))
+        conn2.commit()
+    finally:
+        conn2.close()
+
+    return jsonify({'ok': True})
+
+
 # ── GUÍAS DE SALIDA ───────────────────────────────────────────────────────────
 
 @app.route('/api/guias_salida', methods=['POST'])
