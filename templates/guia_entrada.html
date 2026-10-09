@@ -136,6 +136,28 @@ input.price-inp{text-align:right;max-width:110px}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end}
 .btn-modal-cancel{background:#1a3328;border:1px solid #2a5040;color:#8ab5a0;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:.85rem}
 .btn-modal-ok{background:#1e5c38;border:1px solid #2a7049;color:#98e6b0;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:.85rem;font-weight:600}
+
+/* ── Modal editar guia ── */
+.edit-modal-bg{display:none;position:fixed;inset:0;background:#0009;z-index:2500;align-items:flex-start;justify-content:center;padding:24px;overflow-y:auto}
+.edit-modal-bg.open{display:flex}
+.edit-modal{background:#162d22;border:1px solid #2a5040;border-radius:14px;padding:24px;width:100%;max-width:820px;margin:auto}
+.edit-modal h3{color:#98e6b0;margin-bottom:4px;font-size:1.05rem}
+.edit-modal-sub{font-size:.8rem;color:#8ab5a0;margin-bottom:18px}
+.edit-meta-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px}
+@media(max-width:600px){.edit-meta-grid{grid-template-columns:1fr}}
+.edit-tbl{width:100%;border-collapse:collapse;font-size:.8rem;margin-bottom:10px}
+.edit-tbl thead th{background:#1e3828;color:#8ab5a0;padding:7px 8px;text-align:left;border-bottom:1px solid #2a5040;font-weight:600;white-space:nowrap}
+.edit-tbl tbody td{padding:5px 6px;border-bottom:1px solid #1e3828;vertical-align:middle}
+.edit-tbl .td-del{text-align:center;width:32px}
+.btn-edit-del{background:none;border:none;cursor:pointer;color:#c44;font-size:.9rem;padding:2px 5px;border-radius:4px;line-height:1}
+.btn-edit-del:hover{background:rgba(200,50,50,.15)}
+.btn-add-edit{background:#1a3328;border:1px dashed #2a5040;color:#98e6b0;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:.8rem;width:100%;margin-bottom:14px;transition:background .15s}
+.btn-add-edit:hover{background:#1e3d2a}
+.edit-actions{display:flex;gap:10px;justify-content:flex-end;padding-top:6px;border-top:1px solid #2a5040}
+.btn-edit-cancel{background:#1a3328;border:1px solid #2a5040;color:#8ab5a0;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:.85rem}
+.btn-edit-save{background:#1e5c38;border:1px solid #2a7049;color:#98e6b0;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:.85rem;font-weight:600}
+.btn-editar-guia{background:none;border:none;cursor:pointer;font-size:.85rem;padding:2px 6px;border-radius:5px;color:#81d4fa;opacity:.7;transition:opacity .15s,background .15s;line-height:1}
+.btn-editar-guia:hover{opacity:1;background:rgba(100,180,250,.12)}
 </style>
 </head>
 <body>
@@ -627,6 +649,7 @@ function renderGuiaCard(g) {
         <span class="hfecha">${g.fecha || '—'}</span>
         <span class="hprov">${g.proveedor || '—'}</span>
         <span class="htotal">$${total}</span>
+        <button class="btn-editar-guia" onclick="abrirEditar(${g.id}, event)" title="Editar entrada">✏️</button>
         <button class="btn-eliminar-guia" onclick="eliminarGuia(${g.id}, event)" title="Eliminar entrada">🗑</button>
         <span class="harrow">▶</span>
       </div>
@@ -672,6 +695,207 @@ function showToast(msg, error=false) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3200);
 }
+
+// ── EDITAR GUÍA ──────────────────────────────────────────────────────────────
+let _editId   = null;
+let _editRows = [];
+let _editProds = [];
+
+async function abrirEditar(gid, e) {
+  e.stopPropagation();
+  // Cargar datos de la guia
+  const r = await fetch('/api/guias_entrada');
+  const d = await r.json();
+  const guia = (d.guias || d || []).find(g => g.id === gid);
+  if (!guia) { showToast('No se encontró el registro', true); return; }
+  _editId   = gid;
+  _editRows = JSON.parse(JSON.stringify(guia.items || []));
+  _editProds = productosDB.slice();
+
+  // Rellenar meta
+  document.getElementById('edit-proveedor').value  = guia.proveedor || '';
+  document.getElementById('edit-fecha').value      = fechaIso(guia.fecha || '');
+  document.getElementById('edit-obs').value        = guia.observacion || '';
+
+  renderEditRows();
+  document.getElementById('edit-modal-bg').classList.add('open');
+}
+
+function fechaIso(f) {
+  // "24-08-2026" → "2026-08-24"
+  if (!f) return '';
+  const p = f.split('-');
+  if (p.length === 3 && p[2].length === 4) return `${p[2]}-${p[1]}-${p[0]}`;
+  return f;
+}
+
+function fechaCl(f) {
+  // "2026-08-24" → "24-08-2026"
+  if (!f) return '';
+  const p = f.split('-');
+  if (p.length === 3 && p[0].length === 4) return `${p[2]}-${p[1]}-${p[0]}`;
+  return f;
+}
+
+function renderEditRows() {
+  const tbody = document.getElementById('edit-tbody');
+  tbody.innerHTML = _editRows.map((it, i) => {
+    const pNombre = it.nombre || (_editProds.find(p => p.id === it.producto_id) || {}).nombre || '';
+    return `<tr id="edit-row-${i}">
+      <td>
+        <div class="ac-wrap" id="eac-wrap-${i}">
+          <input class="ac-input" id="eac-inp-${i}" type="text" autocomplete="off" spellcheck="false"
+            placeholder="— Sin asignar —" value="${esc(pNombre)}"
+            oninput="eacFilter(${i})" onfocus="eacOpen(${i})" onblur="eacBlur(${i})" onkeydown="eacKey(event,${i})">
+          <button class="ac-clear" onclick="eacClear(${i})" tabindex="-1" title="Quitar">✕</button>
+          <div class="ac-dropdown" id="eac-drop-${i}"></div>
+        </div>
+        <input type="hidden" id="epid-${i}" value="${it.producto_id || ''}">
+      </td>
+      <td><input class="num-inp" type="number" min="1" id="ecant-${i}" value="${it.cantidad || 1}" style="max-width:70px"></td>
+      <td><input class="price-inp" type="number" min="0" id="eprice-${i}" value="${it.precio_unit || 0}" style="max-width:100px"></td>
+      <td class="td-num" id="eval-${i}">$${((it.valor || 0)).toLocaleString('es-CL')}</td>
+      <td class="td-del"><button class="btn-edit-del" onclick="editDelRow(${i})" title="Eliminar fila">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  // Recalcular val on cant/price change
+  _editRows.forEach((_, i) => {
+    document.getElementById(`ecant-${i}`)?.addEventListener('input', () => recalcEditRow(i));
+    document.getElementById(`eprice-${i}`)?.addEventListener('input', () => recalcEditRow(i));
+  });
+}
+
+function recalcEditRow(i) {
+  const c = parseInt(document.getElementById(`ecant-${i}`)?.value || 0);
+  const p = parseInt(document.getElementById(`eprice-${i}`)?.value || 0);
+  const cell = document.getElementById(`eval-${i}`);
+  if (cell) cell.textContent = '$' + (c * p).toLocaleString('es-CL');
+}
+
+function editDelRow(i) {
+  _editRows.splice(i, 1);
+  renderEditRows();
+}
+
+function editAddRow() {
+  _editRows.push({ nombre: '', producto_id: null, cantidad: 1, precio_unit: 0, valor: 0 });
+  renderEditRows();
+  // Focus en el último input
+  const last = _editRows.length - 1;
+  setTimeout(() => document.getElementById(`eac-inp-${last}`)?.focus(), 50);
+}
+
+function cerrarEditar() {
+  document.getElementById('edit-modal-bg').classList.remove('open');
+  _editId = null; _editRows = [];
+}
+
+async function guardarEdicion() {
+  const btn = document.getElementById('btn-edit-save');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+
+  // Recoger datos de la UI
+  const proveedor = document.getElementById('edit-proveedor').value.trim();
+  const fecha     = fechaCl(document.getElementById('edit-fecha').value);
+  const obs       = document.getElementById('edit-obs').value.trim();
+
+  const items = _editRows.map((_, i) => {
+    const pid   = document.getElementById(`epid-${i}`)?.value;
+    const cant  = parseInt(document.getElementById(`ecant-${i}`)?.value || 0);
+    const price = parseInt(document.getElementById(`eprice-${i}`)?.value || 0);
+    const pNom  = document.getElementById(`eac-inp-${i}`)?.value.trim() || '';
+    const p     = _editProds.find(p => p.id === parseInt(pid));
+    return {
+      producto_id: pid ? parseInt(pid) : null,
+      nombre:      p?.nombre || pNom,
+      cantidad:    cant,
+      precio_unit: price,
+      valor:       cant * price,
+    };
+  }).filter(it => it.cantidad > 0 && (it.producto_id || it.nombre));
+
+  try {
+    const r = await fetch(`/api/guias_entrada/${_editId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proveedor, fecha, observacion: obs, items }),
+    });
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || 'Error');
+    cerrarEditar();
+    showToast('✅ Guía actualizada correctamente');
+    await cargarHistorial();
+  } catch(err) {
+    showToast('Error: ' + err.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Guardar cambios';
+  }
+}
+
+// ── Autocomplete para el modal de edición ────────────────────────────────────
+let _eacFocused = {};
+
+function eacBuildDrop(i) {
+  const q = (document.getElementById(`eac-inp-${i}`)?.value || '').toLowerCase();
+  const drop = document.getElementById(`eac-drop-${i}`);
+  if (!drop) return;
+  const matches = _editProds.filter(p =>
+    !q || p.nombre.toLowerCase().includes(q)
+  ).slice(0, 30);
+  if (!matches.length) {
+    drop.innerHTML = `<div class="no-match">Sin resultados</div>`;
+  } else {
+    drop.innerHTML = matches.map((p, j) =>
+      `<div class="ac-option" data-idx="${j}" data-id="${p.id}" data-nom="${esc(p.nombre)}"
+        onmousedown="eacSelect(${i},${p.id},'${esc(p.nombre)}')"
+        onmouseenter="eacHover(${i},${j})">${p.nombre}</div>`
+    ).join('');
+  }
+  _eacFocused[i] = -1;
+}
+
+function eacOpen(i) { eacBuildDrop(i); document.getElementById(`eac-drop-${i}`)?.style && (document.getElementById(`eac-drop-${i}`).style.display='block'); const cl = document.getElementById(`eac-wrap-${i}`)?.querySelector('.ac-clear'); if(cl && document.getElementById(`epid-${i}`)?.value) cl.style.display='block'; }
+function eacFilter(i){ eacBuildDrop(i); document.getElementById(`eac-drop-${i}`).style.display='block'; }
+function eacHover(i,j){ _eacFocused[i]=j; document.getElementById(`eac-drop-${i}`)?.querySelectorAll('.ac-option').forEach((el,k)=>el.classList.toggle('hovered',k===j)); }
+function eacSelect(i,pid,nom){ document.getElementById(`eac-inp-${i}`).value=nom; document.getElementById(`epid-${i}`).value=pid; document.getElementById(`eac-drop-${i}`).style.display='none'; const cl=document.getElementById(`eac-wrap-${i}`)?.querySelector('.ac-clear'); if(cl) cl.style.display='block'; }
+function eacClear(i){ document.getElementById(`eac-inp-${i}`).value=''; document.getElementById(`epid-${i}`).value=''; const cl=document.getElementById(`eac-wrap-${i}`)?.querySelector('.ac-clear'); if(cl) cl.style.display='none'; document.getElementById(`eac-inp-${i}`)?.focus(); eacFilter(i); }
+function eacBlur(i){ setTimeout(()=>{ document.getElementById(`eac-drop-${i}`).style.display='none'; },180); }
+function eacKey(e,i){
+  const opts = document.getElementById(`eac-drop-${i}`)?.querySelectorAll('.ac-option') || [];
+  if(e.key==='ArrowDown'){ e.preventDefault(); const n=Math.min((_eacFocused[i]||0)+1,opts.length-1); eacHover(i,n); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); const n=Math.max((_eacFocused[i]||0)-1,0); eacHover(i,n); }
+  else if(e.key==='Enter'||e.key==='Tab'){
+    const fi=_eacFocused[i]??-1;
+    if(fi>=0 && opts[fi]){ e.preventDefault(); eacSelect(i, parseInt(opts[fi].dataset.id), opts[fi].dataset.nom); }
+  }
+  else if(e.key==='Escape'){ document.getElementById(`eac-drop-${i}`).style.display='none'; }
+}
 </script>
+
+<!-- Modal editar guía -->
+<div class="edit-modal-bg" id="edit-modal-bg">
+  <div class="edit-modal">
+    <h3>✏️ Editar entrada</h3>
+    <p class="edit-modal-sub">Modifica los productos, cantidades o datos de esta entrada. El stock se ajustará automáticamente con la diferencia.</p>
+    <div class="edit-meta-grid">
+      <div><label>Proveedor</label><input type="text" id="edit-proveedor"></div>
+      <div><label>Fecha</label><input type="date" id="edit-fecha"></div>
+      <div><label>Observación</label><input type="text" id="edit-obs"></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="edit-tbl">
+        <thead><tr><th style="width:44%">Producto en bodega</th><th style="width:12%">Cant.</th><th style="width:15%">Precio unit.</th><th style="width:18%;text-align:right">Total</th><th style="width:6%"></th></tr></thead>
+        <tbody id="edit-tbody"></tbody>
+      </table>
+    </div>
+    <button class="btn-add-edit" onclick="editAddRow()">+ Agregar fila</button>
+    <div class="edit-actions">
+      <button class="btn-edit-cancel" onclick="cerrarEditar()">Cancelar</button>
+      <button class="btn-edit-save" id="btn-edit-save" onclick="guardarEdicion()">💾 Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
