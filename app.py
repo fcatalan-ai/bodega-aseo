@@ -427,6 +427,7 @@ def eliminar_producto(pid):
 @login_required
 def get_costos_producto(pid):
     """Retorna historial de compras y costo promedio ponderado desde guias_entrada."""
+    import json as _json
     guias = db_fetchall(
         "SELECT guia_id, fecha, proveedor, items_json FROM guias_entrada ORDER BY fecha ASC, id ASC", ())
     compras = []
@@ -435,7 +436,7 @@ def get_costos_producto(pid):
     for g in guias:
         items_raw = g.get('items_json') or '[]'
         try:
-            items = json.loads(items_raw) if isinstance(items_raw, str) else items_raw
+            items = _json.loads(items_raw) if isinstance(items_raw, str) else items_raw
         except Exception:
             continue
         if not isinstance(items, list):
@@ -489,6 +490,7 @@ def get_costos_producto(pid):
 @app.route('/api/debug/costos/<int:pid>', methods=['GET'])
 @login_required
 def debug_costos(pid):
+    import json as _json
     guias = db_fetchall(
         "SELECT id, guia_id, fecha, proveedor, items_json FROM guias_entrada ORDER BY id DESC LIMIT 50", ())
     resumen_guias = []
@@ -496,7 +498,7 @@ def debug_costos(pid):
     for g in guias:
         items_raw = g.get('items_json') or '[]'
         try:
-            items = json.loads(items_raw) if isinstance(items_raw, str) else items_raw
+            items = _json.loads(items_raw) if isinstance(items_raw, str) else items_raw
         except Exception:
             items = []
         resumen_guias.append({
