@@ -491,6 +491,7 @@ def get_costos_producto(pid):
 def debug_costos(pid):
     guias = db_fetchall(
         "SELECT id, guia_id, fecha, proveedor, items_json FROM guias_entrada ORDER BY id DESC LIMIT 50", ())
+    resumen_guias = []
     resultado = []
     for g in guias:
         items_raw = g.get('items_json') or '[]'
@@ -498,20 +499,31 @@ def debug_costos(pid):
             items = json.loads(items_raw) if isinstance(items_raw, str) else items_raw
         except Exception:
             items = []
-        for it in items:
-            resultado.append({
-                'guia_id': g.get('guia_id'),
-                'item_producto_id': it.get('producto_id'),
-                'item_producto_id_type': type(it.get('producto_id')).__name__,
-                'nombre': it.get('nombre'),
-                'cantidad': it.get('cantidad'),
-                'precio_unit': it.get('precio_unit'),
-                'valor': it.get('valor'),
-                'match_pid': str(it.get('producto_id')) == str(pid),
-            })
-    return jsonify({'pid_buscado': pid, 'total_items_en_bd': len(resultado),
-                    'items_que_coinciden': [r for r in resultado if r['match_pid']],
-                    'muestra_todos': resultado[:30]})
+        resumen_guias.append({
+            'id': g.get('id'), 'guia_id': g.get('guia_id'),
+            'fecha': g.get('fecha'), 'proveedor': g.get('proveedor'),
+            'n_items': len(items) if isinstance(items, list) else 'error_parse',
+            'items_json_preview': (items_raw or '')[:120]
+        })
+        if isinstance(items, list):
+            for it in items:
+                resultado.append({
+                    'guia_id': g.get('guia_id'),
+                    'item_producto_id': it.get('producto_id'),
+                    'tipo': type(it.get('producto_id')).__name__,
+                    'nombre': it.get('nombre'),
+                    'cantidad': it.get('cantidad'),
+                    'precio_unit': it.get('precio_unit'),
+                    'match': int(float(it.get('producto_id') or 0)) == pid if it.get('producto_id') is not None else False,
+                })
+    return jsonify({
+        'pid_buscado': pid,
+        'total_guias_en_bd': len(guias),
+        'resumen_guias': resumen_guias,
+        'total_items_en_bd': len(resultado),
+        'items_que_coinciden': [r for r in resultado if r['match']],
+        'muestra_20_items': resultado[:20]
+    })
 
 # ── PAGINA PUBLICA POR QR (sin login) ────────────────────────────────────────
 @app.route('/producto/<int:pid>/publico')
