@@ -441,9 +441,10 @@ def get_costos_producto(pid):
         if not isinstance(items, list):
             continue
         for it in items:
-            # producto_id puede venir como int o string
+            # producto_id puede venir como int, string o float — comparar por valor numérico
+            raw_pid = it.get('producto_id')
             try:
-                it_pid = int(it.get('producto_id') or 0)
+                it_pid = int(float(raw_pid)) if raw_pid is not None else 0
             except Exception:
                 it_pid = 0
             if it_pid != pid:
@@ -483,6 +484,34 @@ def get_costos_producto(pid):
         'costo_promedio': costo_promedio,
         'ultimo_precio':  ultimo_precio,
     })
+
+# ── DEBUG: inspeccionar items_json de guias para un producto ─────────────────
+@app.route('/api/debug/costos/<int:pid>', methods=['GET'])
+@login_required
+def debug_costos(pid):
+    guias = db_fetchall(
+        "SELECT id, guia_id, fecha, proveedor, items_json FROM guias_entrada ORDER BY id DESC LIMIT 50", ())
+    resultado = []
+    for g in guias:
+        items_raw = g.get('items_json') or '[]'
+        try:
+            items = json.loads(items_raw) if isinstance(items_raw, str) else items_raw
+        except Exception:
+            items = []
+        for it in items:
+            resultado.append({
+                'guia_id': g.get('guia_id'),
+                'item_producto_id': it.get('producto_id'),
+                'item_producto_id_type': type(it.get('producto_id')).__name__,
+                'nombre': it.get('nombre'),
+                'cantidad': it.get('cantidad'),
+                'precio_unit': it.get('precio_unit'),
+                'valor': it.get('valor'),
+                'match_pid': str(it.get('producto_id')) == str(pid),
+            })
+    return jsonify({'pid_buscado': pid, 'total_items_en_bd': len(resultado),
+                    'items_que_coinciden': [r for r in resultado if r['match_pid']],
+                    'muestra_todos': resultado[:30]})
 
 # ── PAGINA PUBLICA POR QR (sin login) ────────────────────────────────────────
 @app.route('/producto/<int:pid>/publico')
