@@ -428,7 +428,7 @@ def eliminar_producto(pid):
 def get_costos_producto(pid):
     """Retorna historial de compras y costo promedio ponderado desde guias_entrada."""
     guias = db_fetchall(
-        "SELECT guia_id, fecha, proveedor, items_json FROM guias_entrada ORDER BY fecha ASC", ())
+        "SELECT guia_id, fecha, proveedor, items_json FROM guias_entrada ORDER BY fecha ASC, id ASC", ())
     compras = []
     total_cant = 0
     total_valor = 0
@@ -438,33 +438,50 @@ def get_costos_producto(pid):
             items = json.loads(items_raw) if isinstance(items_raw, str) else items_raw
         except Exception:
             continue
+        if not isinstance(items, list):
+            continue
         for it in items:
+            # producto_id puede venir como int o string
             try:
                 it_pid = int(it.get('producto_id') or 0)
             except Exception:
                 it_pid = 0
             if it_pid != pid:
                 continue
-            cant = int(it.get('cantidad') or 0)
-            precio = int(it.get('precio_unit') or 0)
+            try:
+                cant = int(float(it.get('cantidad') or 0))
+            except Exception:
+                cant = 0
             if cant <= 0:
                 continue
+            # precio_unit puede ser 0; intentar derivarlo desde valor/cantidad
+            try:
+                precio = int(float(it.get('precio_unit') or 0))
+            except Exception:
+                precio = 0
+            if precio == 0:
+                try:
+                    valor_total = int(float(it.get('valor') or 0))
+                    if valor_total > 0 and cant > 0:
+                        precio = round(valor_total / cant)
+                except Exception:
+                    precio = 0
             compras.append({
-                'fecha': g.get('fecha', ''),
-                'proveedor': g.get('proveedor', ''),
-                'guia_id': g.get('guia_id', ''),
-                'cantidad': cant,
+                'fecha':      g.get('fecha', ''),
+                'proveedor':  g.get('proveedor', ''),
+                'guia_id':    g.get('guia_id', ''),
+                'cantidad':   cant,
                 'precio_unit': precio,
             })
             if precio > 0:
-                total_cant += cant
+                total_cant  += cant
                 total_valor += cant * precio
     costo_promedio = round(total_valor / total_cant) if total_cant > 0 else 0
-    ultimo_precio = next((c['precio_unit'] for c in reversed(compras) if c['precio_unit'] > 0), 0)
+    ultimo_precio  = next((c['precio_unit'] for c in reversed(compras) if c['precio_unit'] > 0), 0)
     return jsonify({
-        'compras': compras,
+        'compras':        compras,
         'costo_promedio': costo_promedio,
-        'ultimo_precio': ultimo_precio,
+        'ultimo_precio':  ultimo_precio,
     })
 
 # ── PAGINA PUBLICA POR QR (sin login) ────────────────────────────────────────
