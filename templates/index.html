@@ -416,7 +416,7 @@ async function abrirPanel(id){
   const p = d.producto;
   const bajo = p.stock_minimo>0 && p.stock_actual<=p.stock_minimo;
   document.getElementById('p-nombre').textContent = p.nombre;
-  document.getElementById('p-cat').textContent = p.categoria+' — '+p.unidad;
+  document.getElementById('p-cat').textContent = (p.categoria||'—')+' — '+p.unidad+' · ID #'+id;
   document.getElementById('p-stock').textContent = p.stock_actual+' '+p.unidad;
   document.getElementById('p-minimo').textContent = p.stock_minimo||'Sin definir';
   document.getElementById('p-unidad').textContent = p.unidad;
