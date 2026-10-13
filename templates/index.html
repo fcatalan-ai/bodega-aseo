@@ -461,7 +461,7 @@ async function cargarCostos(pid, unidad){
             <div style="color:#888;font-size:11px">${cmp.fecha||''} · ${cmp.proveedor||''}</div>
           </div>
           <div style="text-align:right">
-            <div style="font-weight:700;color:#0D4F3C">${fmtPeso(cmp.precio_unit)}</div>
+            <div style="font-weight:700;color:${cmp.precio_unit>0?'#0D4F3C':'#aaa'}">${fmtPeso(cmp.precio_unit)}</div>
             <div style="color:#aaa;font-size:11px">${cmp.cantidad} ${unidad}</div>
           </div>
         </div>`).join('');
